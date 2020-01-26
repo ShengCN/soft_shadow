@@ -1,0 +1,14 @@
+.idea/
+weights/*
+.pyc
+*.pyc
+*.png
+*.mp4
+*.pt
+.ipynb_checkpoints/*
+*/ipynb_checkpoints/*
+__pycache__/*
+*/__pycache__/*
+ssn/.ipynb_checkpoints/*
+utils/.ipynb_checkpoints/*
+data_process/.ipynb_checkpoints/*
