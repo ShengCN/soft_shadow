@@ -2,19 +2,22 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .ssn_submodule import Conv, Up, Up_Stream
+from .ssn_submodule import Conv, Up, Up_Stream, get_layer_info
+import argparse
 
 class Relight_SSN(nn.Module):
     """ Implementation of Relighting Net """
 
     def __init__(self, n_channels=3, out_channels=3):
         super(Relight_SSN, self).__init__()
+        norm_layer, activation_func = get_layer_info(32 - n_channels)
+        
         self.in_conv = nn.Sequential(
             nn.Conv2d(n_channels, 32 - n_channels, kernel_size=7, padding=3),
-            nn.BatchNorm2d(32 - n_channels,momentum=0.9),
-            nn.ReLU()
+            norm_layer,
+            activation_func
         )
-
+        
         self.down_256_128 = Conv(32, 64, 2)
         self.down_128_128 = Conv(64, 64, 1)
         self.down_128_64 = Conv(64, 128, 2)

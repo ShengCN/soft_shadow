@@ -15,8 +15,8 @@ from ssn.ssn_dataset import SSN_Dataset
 # from ssn.ssn_submodule import Contract
 from ssn.ssn import Relight_SSN
 from utils.net_utils import save_model, get_lr, set_lr
-
 from utils.visdom_utils import visdom_plot_loss, visdom_relight_results, visdom_log, visdom_show_batch, visdom_show_light
+from params import params as options
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print("Device: ", device)
@@ -30,12 +30,15 @@ def parse_params():
     parser.add_argument('--beta1', type=float, default=0.9, help='momentum for SGD, default=0.9')
     parser.add_argument('--resume', action='store_true', help='resume training')
     parser.add_argument('--weight_file',type=str,  help='weight file')
-    parser.add_argument('--newloss', action='store_true', help='new experiment, new loss')
     parser.add_argument('--multi_gpu', action='store_true', help='use multiple GPU training')
     parser.add_argument('--timers', type=int, default=80, help='number of epochs to train for')
     parser.add_argument('--use_schedule', action='store_true',help='use automatic schedule')
     parser.add_argument('--exp_name', type=str, default='l1 loss',help='experiment name')
-
+    parser.add_argument('--new_exp', action='store_true', help='experiment 2')
+    parser.add_argument('--bilinear', action='store_true', help='use bilinear in up-stream')
+    parser.add_argument('--norm', type=str, default='batch_norm', help='use group norm')
+    parser.add_argument('--prelu', action='store_true', help='use p relue')
+    
     # parser.add_argument('--cpu', action='store_true', help='Force training on CPU')
     params = parser.parse_args()
     return params
@@ -43,13 +46,12 @@ def parse_params():
 # parse args
 params = parse_params()
 print("Params: {}".format(params))
-if params.newloss:
+if params.new_exp:
     exp = 1
-    exp_name = "cross entropy loss"
 else:
     exp = 0
-    exp_name = "L1 loss"
-
+exp_name = params.exp_name
+    
 def data_augmentation():
     """ Transforms passed to training and validating """
     train_trnfs = transforms.Compose([
@@ -89,35 +91,7 @@ def spherical_loss(gt_img, pred_img):
 
 def reconstruct_loss(gt_img, pred_img):
     """ M * (I-I') """
-
-    if params.newloss:
-        batch_size, c, h, w = pred_img.size()
-        human_gt = gt_img[:,0,:,:]
-        shadow_gt = gt_img[:,1,:,:]
-
-        human_mask, shadow_mask = torch.zeros(batch_size, h, w, dtype= torch.float32, device=device), torch.zeros(batch_size, h, w, dtype= torch.float32, device=device)
-        human_mask[torch.where(human_gt !=0)] = 1
-        shadow_mask[torch.where(shadow_gt !=0)] = 1
-
-        human_pos_weight = torch.where(human_gt == 0)[0].size()[0] / float(torch.where(human_gt != 0)[0].size()[0])
-        shadow_pos_weight = torch.where(shadow_gt == 0)[0].size()[0] / float(torch.where(shadow_gt != 0)[0].size()[0])
-
-        human_mask_pos_weight = torch.ones(human_mask.size(), device=device)
-        human_mask_pos_weight[torch.where(human_gt != 0)] = human_pos_weight
-        mask_criterion = nn.BCEWithLogitsLoss(pos_weight=human_mask_pos_weight)
-
-        shadow_mask_pos_weight = torch.ones(shadow_mask.size(), device=device)
-        shadow_mask_pos_weight[torch.where(shadow_gt != 0)] = shadow_pos_weight
-        shadow_criterion = nn.BCEWithLogitsLoss(pos_weight=shadow_mask_pos_weight)
-
-        # import pdb; pdb.set_trace()
-        mask_loss = mask_criterion(pred_img[:,0,:,:], human_mask)
-        shadow_loss = shadow_criterion(pred_img[:,1,:,:], shadow_mask)
-        print('mask loss: {} shadow_loss: {}'.format(mask_loss.item(), shadow_loss.item()))
-        # return mask_loss + shadow_loss
-        return mask_loss + shadow_loss
-    else:
-        return torch.norm((gt_img - pred_img), 2)
+    return torch.norm((gt_img - pred_img), 2)
 
 def loss_functions(ty, sl, sy, gt_ty, gt_sl, gt_sy):
     """ Loss Function:
@@ -363,5 +337,8 @@ def train(params):
     print("Training finished")
 
 if __name__ == "__main__":
+    parameter = options()
+    parameter.set_params(params)
+    
     # trainig
     train(params)

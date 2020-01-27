@@ -8,62 +8,67 @@ import torch.nn.functional as F
 from utils.net_utils import compute_differentiable_params
 from params import params
 
+def get_layer_info(out_channels):
+    parameter = params().get_params()
+    if parameter.norm == 'batch_norm':
+        norm_layer = nn.BatchNorm2d(out_channels, momentum=0.9)
+    elif parameter.norm == 'group_norm':
+        norm_layer = nn.GroupNorm(out_channels//2, out_channels)
+    else:
+        raise Exception('norm name error')
+        
+    activation_func = nn.ReLU()
+    if parameter.prelu:
+        activation_func = nn.PReLU()
+        
+    return norm_layer, activation_func
+
 class Conv(nn.Module):
     """ (convolution => [BN] => ReLU) """
     
     def __init__(self, in_channels, out_channels, conv_stride, activation_func='relu'):
         super().__init__()
-
-        if activation_func == 'relu':
-            self.conv = nn.Sequential(
-                nn.Conv2d(in_channels, out_channels,stride=conv_stride, kernel_size=3, padding=1),
-                nn.BatchNorm2d(out_channels, momentum=0.9),
-                nn.ReLU()
-            )
-        elif activation_func == 'sigmoid':
-            self.conv = nn.Sequential(
-                nn.Conv2d(in_channels, out_channels,stride=conv_stride, kernel_size=3, padding=1),
-                nn.BatchNorm2d(out_channels, momentum=0.9),
-                nn.Sigmoid()
-            )
-        elif activation_func == 'prelu':
-            self.conv = nn.Sequential(
-                nn.Conv2d(in_channels, out_channels,stride=conv_stride, kernel_size=3, padding=1),
-                nn.BatchNorm2d(out_channels,momentum=0.9),
-                nn.PReLU()
-            )
-        elif activation_func =='softplus':
-            self.conv = nn.Sequential(
-                nn.Conv2d(in_channels, out_channels,stride=conv_stride, kernel_size=3, padding=1),
-                nn.BatchNorm2d(out_channels,momentum=0.9),
-                nn.Softplus()
-            )
-        else:
-            assert False
-
-
+        norm_layer, activation_func = get_layer_info(out_channels)
+        
+        self.conv = nn.Sequential(
+            nn.Conv2d(in_channels, out_channels,stride=conv_stride, kernel_size=3, padding=1),
+            norm_layer,
+            activation_func)
+        
     def forward(self, x):
         return self.conv(x)
 
 class Up(nn.Module):
     """ Upscaling then conv """
     
-    def __init__(self, in_channels, out_channels, activation_func='relu'):
+    def __init__(self, in_channels, out_channels):
         super().__init__()
-        parameter = params()
-        kernel_size = parameter.get_trans_conv_kernel()
-        if activation_func == 'prelu':
+        norm_layer, activation_func = get_layer_info(out_channels)
+        
+        # import pdb; pdb.set_trace()
+        
+        parameter = params().get_params()
+        if not parameter.bilinear:
+            up_layer = nn.ConvTranspose2d(in_channels, out_channels, kernel_size=2, stride=2)
             self.up = nn.Sequential(
-                nn.ConvTranspose2d(in_channels, out_channels, kernel_size=kernel_size, stride=2),
-                nn.BatchNorm2d(out_channels,momentum=0.9),
-                nn.PReLU()
-            )
-        elif activation_func == 'relu':
+                up_layer,
+                norm_layer,
+                activation_func)
+        else:
+            up_layer = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
             self.up = nn.Sequential(
-                nn.ConvTranspose2d(in_channels, out_channels, kernel_size=kernel_size, stride=2),
-                nn.BatchNorm2d(out_channels,momentum=0.9),
-                nn.ReLU()
-            )
+                up_layer,
+                Conv(in_channels, in_channels//2, 1),
+                Conv(in_channels//2, out_channels, 1),
+                norm_layer,
+                activation_func)
+            
+        # self.up = nn.Sequential(
+        #         up_layer,
+        #         nn.BatchNorm2d(out_channels,momentum=0.9),
+        #         nn.ReLU()
+        #     )
+        # self.up = up_layer
 
     def forward(self, x):
         return self.up(x)
@@ -117,7 +122,6 @@ class Up_Stream(nn.Module):
         # print(y.size())
         
         # import pdb; pdb.set_trace()
-        
         y = self.up_16_32(y)            # 256 x 32 x 32
         # print(y.size())
         
