@@ -44,7 +44,6 @@ class IBL_Transform(object):
         # print('3 min: {} max: {} shape: {}'.format(np.min(img),np.max(img), img.shape))
         return img.reshape(16,32,1)
 
-
 class Mask_Transform(object):
     """ Mask transforms before training
         Input: PIL image
@@ -70,102 +69,45 @@ class SSN_Dataset(Dataset):
         self.to_tensor = ToTensor()
         self.mask_transfrom = Mask_Transform()
         self.ibl_transform = IBL_Transform()
-
-        self.first_init()
+        
         end = time.time()
         print("Dataset initialize spent: {} ms".format(end - start))
 
         # fake random
         np.random.seed(19950220)
-        np.random.shuffle(self.keys)
-        self.training_num = len(self.keys) - int(len(self.keys) / 10)
-
-        # statistics
-        self.stats_keys = {k: 0 for k in self.keys}
+        np.random.shuffle(self.meta_data)
+        self.training_num = len(self.meta_data) - int(len(self.meta_data) / 10)
 
     def __len__(self):
         if self.is_training:
             return self.training_num
         else:
-            return len(self.keys) - self.training_num
+            return len(self.meta_data) - self.training_num
 
         # exp_one_data
         # return 1
 
     def __getitem__(self, idx):
-        """ randomly select two pairs """
-
         if self.is_training and idx > self.training_num:
             print("error")
 
         # offset to validation set
         if not self.is_training:
             idx = self.training_num + idx
-
-        # exp_one_data
-        # idx = 0
-        self.statistics(self.keys[idx])
-
-        # random select one pair
-        data_list = self.hash[self.keys[idx]]
-        mask_path, shadow_path, light_path = random.choice(data_list)
         
-        counter = 0
-        # in case the same as idx
-        while True:
-            counter += 1
-            nov_mask_path, nov_shadow_path, nov_light_path = random.choice(data_list)
-            if counter > 100:
-                print('please check meta data file')
-            # print('old random: {} new random: {}'.format(mask_path,nov_mask_path))
-            if nov_mask_path != mask_path:
-                break
-
+        path_list = self.meta_data[idx]
+        
+        mask_path, light_path, shadow_path = path_list[1], path_list[3], path_list[2]
+        
         # convert image to [0.0, 1.0]
         mask_img = self.mask_transfrom(Image.open(mask_path))
-        shadow_img = 1.0 - self.mask_transfrom(Image.open(shadow_path))
         light_img = self.ibl_transform(Image.open(light_path))
+        shadow_img = 1.0 - self.mask_transfrom(Image.open(shadow_path))
 
-        nov_mask_img = self.mask_transfrom(Image.open(nov_mask_path))
-        nov_shadow_img = 1.0 - self.mask_transfrom(Image.open(nov_shadow_path))
-        nov_light_img = self.ibl_transform(Image.open(nov_light_path))
+        mask_img, shadow_img, light_img = self.to_tensor(mask_img), self.to_tensor(shadow_img),torch.clamp(self.to_tensor(light_img),0.0,1.0)
 
-        mask_img, nov_mask_img = self.to_tensor(mask_img), self.to_tensor(nov_mask_img)
-        light_img, nov_light_img = torch.clamp(self.to_tensor(light_img),0.0,1.0),  torch.clamp(self.to_tensor(nov_light_img),0.0,1.0)
-        shadow_img, nov_shadow_img = self.to_tensor(shadow_img), self.to_tensor(nov_shadow_img)
-
-        return mask_img, light_img, shadow_img, nov_mask_img, nov_light_img, nov_shadow_img
-
-    def first_init(self):
-        """ construct hash map """
-        """ key(camera pos, human rotation) -> list(prefix) """
-
-        self.hash = dict()
-        self.keys = set()
-
-        for data in self.meta_data:
-            filename = os.path.basename(data[1])
-            prefix = self.get_prefix(filename)
-            camera_position = data[4]
-            human_rot = data[5]
-            
-            file_type = data[0]
-            # key = (file_type,camera_position, human_rot)
-            key = (file_type, camera_position, human_rot)
-
-            # initialize the dict value
-            if key not in self.hash.keys():
-                self.hash[key] = []
-
-            mask_path = data[1]
-            shadow_path = data[2]
-            light_path = data[3]
-            self.hash[key].append((mask_path, shadow_path, light_path))
-            self.keys.add(key)
-
-        self.keys = list(self.keys)
-        
-
+        return mask_img, light_img, shadow_img
+    
     def get_prefix(self, path):
         return path[0:path.find('_')]
 

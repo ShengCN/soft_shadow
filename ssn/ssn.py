@@ -3,15 +3,20 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from .ssn_submodule import Conv, Up, Up_Stream, get_layer_info
-import argparse
+from params import params
 
 class Relight_SSN(nn.Module):
     """ Implementation of Relighting Net """
 
     def __init__(self, n_channels=3, out_channels=3):
         super(Relight_SSN, self).__init__()
+        
+        # import pdb; pdb.set_trace()
         norm_layer, activation_func = get_layer_info(32 - n_channels)
         
+        # norm_layer = nn.BatchNorm2d(32 - n_channels, momentum=0.9)
+        
+        # import pdb; pdb.set_trace()
         self.in_conv = nn.Sequential(
             nn.Conv2d(n_channels, 32 - n_channels, kernel_size=7, padding=3),
             norm_layer,
@@ -39,7 +44,8 @@ class Relight_SSN(nn.Module):
     def forward(self, x, tl):
         x1 = self.in_conv(x)  # 29 x 256 x 256
         # print(x1.size())
-
+        # import pdb; pdb.set_trace()
+        
         x1 = torch.cat((x, x1), dim=1)  # 32 x 256 x 256 todo_check the dim parameters
         # print(x1.size())
 

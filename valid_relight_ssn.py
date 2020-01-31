@@ -18,15 +18,21 @@ from utils.utils_file import create_folder
 import matplotlib.pyplot as plt
 from scipy.ndimage.filters import gaussian_filter
 from skimage.transform import resize
+from params import params as options, parse_params
 
-device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
+# params = parse_params()
+
+params = options().get_params()
+print(params)
+
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print("Device: ", device)
 model = Relight_SSN(1,1)
-weight_file = os.path.join('weights', 'without batchnorm after up layers_27-January-12-02-AM.pt')
-checkpoint = torch.load(weight_file)    
+weight_file = os.path.join('weights', 'bilinear_groupnorm_30-January-12-44-PM.pt')
+checkpoint = torch.load(weight_file, map_location=device)    
 model.to(device)
 model.load_state_dict(checkpoint['model_state_dict'])
-    
+
 def to_one_batch(img_tensor):
     c,h,w = img_tensor.size()
     return img_tensor.view(1,c,h,w)
@@ -168,31 +174,29 @@ def render_animation(target_mask_np, output_folder, light_folder=""):
     mask = np.copy(target_mask_np)
     mask = np.squeeze(to_mask(mask))
     
-    model.eval()
-    with torch.no_grad():
-        cur_ibl = get_first_ibl()
-        counter = 0
-        with tqdm(total=16 * 32) as tbar:
-            for i in range(16):
-                for j in range(32):
-                    out_fname = '{:07d}.png'.format(counter)
-                    predict_fname = os.path.join(output_folder, out_fname)                    
-                    
-                    new_ibl = rotate_ibl(cur_ibl, step=10)
-                    new_ibl = cur_ibl + new_ibl * 0.0
-                    pred_shadow = predict(target_mask_np, new_ibl)
-                    
-                    saving_result = pred_shadow
-                    saving_result[:16,:32] = 1.0 - new_ibl
-                    
-                    saving_result[np.where(mask != 0)] = 1.0
-                    plt.imsave(predict_fname, mask_to_rgb(saving_result))
-
-                    tbar.update()
-                    counter += 1
-                    cur_ibl = rotate_ibl(cur_ibl)
-                    
-                cur_ibl = rotate_ibl(cur_ibl, axis=0)
+    cur_ibl = get_first_ibl()
+    counter = 0
+    with tqdm(total=16 * 32) as tbar:
+        for i in range(16):
+            for j in range(32):
+                out_fname = '{:07d}.png'.format(counter)
+                predict_fname = os.path.join(output_folder, out_fname)                    
+                
+                new_ibl = rotate_ibl(cur_ibl, step=10)
+                new_ibl = cur_ibl + new_ibl * 0.0
+                pred_shadow = predict(target_mask_np, new_ibl)
+                
+                saving_result = pred_shadow
+                saving_result[:16,:32] = 1.0 - new_ibl
+                
+                saving_result[np.where(mask != 0)] = 1.0
+                np.clip(saving_result, 0.0, 1.0, out=saving_result)
+                plt.imsave(predict_fname, mask_to_rgb(saving_result))
+                tbar.update()
+                counter += 1
+                cur_ibl = rotate_ibl(cur_ibl)
+                
+            cur_ibl = rotate_ibl(cur_ibl, axis=0)
             
     
 if __name__ == '__main__':

@@ -13,13 +13,18 @@ def get_layer_info(out_channels):
     if parameter.norm == 'batch_norm':
         norm_layer = nn.BatchNorm2d(out_channels, momentum=0.9)
     elif parameter.norm == 'group_norm':
-        norm_layer = nn.GroupNorm(out_channels//2, out_channels)
+        if out_channels >= 32:
+            group_num = 32
+        else:
+            group_num = 1
+            
+        norm_layer = nn.GroupNorm(group_num, out_channels)
     else:
         raise Exception('norm name error')
         
     activation_func = nn.ReLU()
     if parameter.prelu:
-        activation_func = nn.PReLU()
+        activation_func = nn.PReLU(out_channels)
         
     return norm_layer, activation_func
 

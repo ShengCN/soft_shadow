@@ -4,7 +4,6 @@ from torch.utils.data import Dataset, DataLoader
 import torch.optim as optim
 import torchvision
 import torchvision.transforms as transforms
-import argparse
 import time
 from tqdm import tqdm
 import numpy as np
@@ -16,32 +15,10 @@ from ssn.ssn_dataset import SSN_Dataset
 from ssn.ssn import Relight_SSN
 from utils.net_utils import save_model, get_lr, set_lr
 from utils.visdom_utils import visdom_plot_loss, visdom_relight_results, visdom_log, visdom_show_batch, visdom_show_light
-from params import params as options
+from params import params as options, parse_params
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print("Device: ", device)
-
-def parse_params():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--workers', type=int, help='number of data loading workers', default=16)
-    parser.add_argument('--batch_size', type=int, default=28, help='input batch size during training')
-    parser.add_argument('--epochs', type=int, default=10000, help='number of epochs to train for')
-    parser.add_argument('--lr', type=float, default=0.003, help='learning rate, default=0.005')
-    parser.add_argument('--beta1', type=float, default=0.9, help='momentum for SGD, default=0.9')
-    parser.add_argument('--resume', action='store_true', help='resume training')
-    parser.add_argument('--weight_file',type=str,  help='weight file')
-    parser.add_argument('--multi_gpu', action='store_true', help='use multiple GPU training')
-    parser.add_argument('--timers', type=int, default=80, help='number of epochs to train for')
-    parser.add_argument('--use_schedule', action='store_true',help='use automatic schedule')
-    parser.add_argument('--exp_name', type=str, default='l1 loss',help='experiment name')
-    parser.add_argument('--new_exp', action='store_true', help='experiment 2')
-    parser.add_argument('--bilinear', action='store_true', help='use bilinear in up-stream')
-    parser.add_argument('--norm', type=str, default='batch_norm', help='use group norm')
-    parser.add_argument('--prelu', action='store_true', help='use p relue')
-    
-    # parser.add_argument('--cpu', action='store_true', help='Force training on CPU')
-    params = parser.parse_args()
-    return params
 
 # parse args
 params = parse_params()
@@ -116,7 +93,7 @@ def loss_functions(ty, sl, sy, gt_ty, gt_sl, gt_sy):
     # return bn_light_loss, recon_ori_mask_loss + recon_ori_shadow_loss, recon_nov_mask_loss + recon_nov_shadow_loss
     return bn_light_loss, recon_nov_loss, recon_ori_loss
 
-def training_iteration(model, train_dataloder, optimizer, train_loss, light_training_loss, recon_training_loss, nov_training_loss, epoch_num):
+def training_iteration(model, train_dataloder, optimizer, train_loss, epoch_num):
     # training
     cur_epoch_loss = 0.0
     model.train()
@@ -126,38 +103,32 @@ def training_iteration(model, train_dataloder, optimizer, train_loss, light_trai
 
         vis_predicted_img = torch.zeros(1)
         for j in range(params.timers):
-            for i, (mask, light, shadow, nov_mask, nov_light, nov_shadow) in enumerate(train_dataloder):
+            for i, (mask, light, shadow) in enumerate(train_dataloder):
         
                 # concatenate human mask and shadow mask
                 # I_s = torch.cat((mask, shadow), dim=1).to(device)
                 # I_t = torch.cat((nov_mask, nov_shadow), dim=1).to(device)
+                # import pdb; pdb.set_trace()
                 
-                I_s = mask.to(device)
-                L_t = nov_light.to(device)
-                I_t = nov_shadow.to(device)
-                L_s = light.to(device)
+                I_s, L_t, I_t = mask.to(device), light.to(device), shadow.to(device)
 
                 optimizer.zero_grad()
-                # predict transfer
+                
+                # predict 
                 predicted_img, predicted_src_light = model(I_s, L_t)
 
                 # compute loss
-                bn_light_loss = spherical_loss(L_s, predicted_src_light)
-                recon_nov_loss = reconstruct_loss(I_t, predicted_img)
-                loss = recon_nov_loss + bn_light_loss * 0.0
+                loss = reconstruct_loss(I_t, predicted_img)
 
                 loss.backward()
                 optimizer.step()
-
+                
                 cur_epoch_loss += loss.item()
                 
                 # visualize results
                 if i % 10 == 0:
                     vis_predicted_img = torch.clamp(predicted_img, 0.0, 1.0).clone().cpu()
-                    vis_predicted_light = torch.clamp(predicted_src_light.view(-1, 1, 16, 32), 0.0, 1.0).detach().cpu()
-
                     vis_predicted_img_gt = I_t.detach().cpu()
-                    vis_predicted_light_gt = L_s.detach().cpu()
 
                     batch_size, c, h, w = vis_predicted_img.size()
 
@@ -165,23 +136,21 @@ def training_iteration(model, train_dataloder, optimizer, train_loss, light_trai
                     vis_shadow_img = torch.cat((vis_predicted_img_gt[0:random_batch, :, :, :].view(random_batch, 1, h, w), vis_predicted_img[0:random_batch, :, :, :].view(random_batch,1,h, w)))
 
                     torchvision.utils.save_image(predicted_img[0:random_batch, 0, :, :].view(random_batch, 1,h, w), "{}_shadow.png".format(exp_name), nrow=4)
-                    visdom_show_batch(vis_shadow_img, win_name="train shadow gt vs. inference", exp=exp)
                     visdom_show_batch(mask[:random_batch,:,:,:], win_name="train masks", exp=exp)
+                    visdom_show_batch(vis_shadow_img, win_name="train shadow gt vs. inference", exp=exp)
                     
                 # keep tracking
-                train_loss.append(loss.item())
-                nov_training_loss.append(recon_nov_loss.item())
+                train_loss.append(loss.item() / params.batch_size)
 
-                visdom_plot_loss("train_total_loss", train_loss,exp)
-                visdom_plot_loss("train_recons_nov_loss", nov_training_loss,exp)
+                visdom_plot_loss("train_total_loss", train_loss, exp)
 
                 t.update()
 
     # Finish one epoch
-    cur_epoch_loss /= (params.timers * len(train_dataloder))
+    cur_epoch_loss /= (params.timers * len(train_dataloder) * params.batch_size)
     return cur_epoch_loss
 
-def validation_iteration(model, valid_dataloader, valid_loss, light_valid_loss, recon_valid_loss, nov_valid_loss,epoch_num):
+def validation_iteration(model, valid_dataloader, valid_loss, epoch_num):
     cur_epoch_loss = 0.0
     model.eval()
 
@@ -191,7 +160,7 @@ def validation_iteration(model, valid_dataloader, valid_loss, light_valid_loss, 
             vis_predicted_img = torch.zeros(1)
 
             for j in range(params.timers):
-                for i, (mask, light, shadow, nov_mask, nov_light, nov_shadow) in enumerate(valid_dataloader):
+                for i, (mask, light, shadow) in enumerate(valid_dataloader):
 
                     # concatenate human mask and shadow mask
 #                     I_s = torch.cat((mask, shadow), dim=1).to(device)
@@ -200,31 +169,23 @@ def validation_iteration(model, valid_dataloader, valid_loss, light_valid_loss, 
 #                     L_s = light.to(device)
 
                     I_s = mask.to(device)
-                    L_t = nov_light.to(device)
-                    I_t = nov_shadow.to(device)
-                    L_s = light.to(device)
+                    L_t = light.to(device)
+                    I_t = shadow.to(device)
 
                     # predict transfer
                     predicted_img, predicted_src_light = model(I_s, L_t)
 
                     # compute loss
-                    bn_light_loss = spherical_loss(L_s, predicted_src_light)
-                    recon_nov_loss = reconstruct_loss(I_t, predicted_img)
-                    loss = recon_nov_loss + bn_light_loss * 0.0
+                    loss = reconstruct_loss(I_t, predicted_img)
 
                     cur_epoch_loss += loss.item()
 
                     # visualize results
                     if i % 10 == 0:
                         vis_predicted_img = torch.clamp(predicted_img, 0.0, 1.0).clone().cpu()
-                        vis_predicted_light = torch.clamp(predicted_src_light.view(-1, 1, 16, 32), 0.0,
-                                                          1.0).detach().cpu()
-
                         vis_predicted_img_gt = I_t.detach().cpu()
-                        vis_predicted_light_gt = L_s.detach().cpu()
 
                         batch_size, c, h, w = vis_predicted_img.size()
-
                         random_batch = min(4, batch_size)
                         vis_shadow_img = torch.cat((vis_predicted_img_gt[0:random_batch, :, :, :].view(random_batch, 1,
                                                                                                        h, w),
@@ -233,20 +194,18 @@ def validation_iteration(model, valid_dataloader, valid_loss, light_valid_loss, 
                         torchvision.utils.save_image(predicted_img[0:random_batch, :, :, :].view(random_batch, 1, h, w),
                                                      "valid_{}_shadow.png".format(exp_name), nrow=4,
                                                      normalize=True)
-
-                        visdom_show_batch(vis_shadow_img, win_name="valid shadow gt vs. inference", exp=exp)
+                        
                         visdom_show_batch(mask[:random_batch,:,:,:], win_name="valid masks", exp=exp)
+                        visdom_show_batch(vis_shadow_img, win_name="valid shadow gt vs. inference", exp=exp)
                         
                     # keep tracking
-                    valid_loss.append(loss.item())
-                    nov_valid_loss.append(recon_nov_loss.item())
+                    valid_loss.append(loss.item() / params.batch_size)
 
                     visdom_plot_loss("valid_total_loss", valid_loss, exp)
-                    visdom_plot_loss("valid_nov_loss", nov_valid_loss, exp)
                     t.update()
 
     # Finish one epoch
-    cur_epoch_loss /= (params.timers * len(valid_dataloader)) 
+    cur_epoch_loss /= (params.timers * len(valid_dataloader) * params.batch_size) 
     return cur_epoch_loss
 
 def train(params):
@@ -297,17 +256,14 @@ def train(params):
 
     # training states
     train_loss, valid_loss = [], []
-    light_training_loss, light_valid_loss = [], []
-    recon_training_loss, recon_valid_loss = [], []
-    nov_training_loss, nov_valid_loss = [], []
 
     # training iterations
     for epoch in range(params.epochs):
         # training
-        cur_train_loss = training_iteration(model, train_dataloder, optimizer, train_loss, light_training_loss, recon_training_loss, nov_training_loss, epoch)
+        cur_train_loss = training_iteration(model, train_dataloder, optimizer, train_loss, epoch)
 
         # validation
-        cur_valid_loss = validation_iteration(model, valid_dataloader, valid_loss, light_valid_loss, recon_valid_loss, nov_valid_loss, epoch)
+        cur_valid_loss = validation_iteration(model, valid_dataloader, valid_loss, epoch)
         
         if params.use_schedule:
             scheduler.step(cur_valid_loss)
@@ -336,9 +292,6 @@ def train(params):
 
     print("Training finished")
 
-if __name__ == "__main__":
-    parameter = options()
-    parameter.set_params(params)
-    
+if __name__ == "__main__":    
     # trainig
     train(params)
