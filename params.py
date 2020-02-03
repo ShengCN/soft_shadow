@@ -13,11 +13,10 @@ class params():
         def set_params(self, options):
             self.options = options
             self.norm = options.norm
-            self.prelu = options.prelu
             self.bilinear = options.bilinear
             
         def __str__(self):
-            return 'norm: {} bilinear: {} prelu: {}'.format(self.norm, self.bilinear, self,prelu)
+            return 'norm: {} bilinear: {} activation: {}'.format(self.norm, self.bilinear, self.activation)
         
     # private static variable
     param_instance = None
@@ -48,7 +47,6 @@ def parse_params():
     parser.add_argument('--new_exp', action='store_true', help='experiment 2')
     parser.add_argument('--bilinear', action='store_true', help='use bilinear in up-stream')
     parser.add_argument('--norm', type=str, default='batch_norm', help='use group norm')
-    parser.add_argument('--prelu', action='store_true', help='use p relue')
     
     # parser.add_argument('--cpu', action='store_true', help='Force training on CPU')
     arguments = parser.parse_args()

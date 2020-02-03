@@ -19,6 +19,8 @@ import matplotlib.pyplot as plt
 from scipy.ndimage.filters import gaussian_filter
 from skimage.transform import resize
 from params import params as options, parse_params
+import multiprocessing
+from multiprocessing import set_start_method
 
 # params = parse_params()
 
@@ -28,7 +30,7 @@ print(params)
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print("Device: ", device)
 model = Relight_SSN(1,1)
-weight_file = os.path.join('weights', 'bilinear_groupnorm_30-January-12-44-PM.pt')
+weight_file = os.path.join('weights', 'bilinear_groupnorm_03-February-03-06-AM.pt')
 checkpoint = torch.load(weight_file, map_location=device)    
 model.to(device)
 model.load_state_dict(checkpoint['model_state_dict'])
@@ -140,7 +142,7 @@ def predict_testing_results(input_folder, output_folder):
 #             predicted_img, predicted_ibl = model(I_s, L_t)
 #             save_results(predicted_img, os.path.join(output_folder, os.path.splitext(file)[0] + ".png"))
     print('not modified yet')
-
+    
 def render_animation(target_mask_np, output_folder, light_folder=""):
     """ Given a mask(w x h x 3, uint8), render a sequence of images for making an animation"""
     def get_first_ibl():
@@ -171,34 +173,45 @@ def render_animation(target_mask_np, output_folder, light_folder=""):
         target_mask_np = resize(target_mask_np, (256,256,1))
         return target_mask_np
     
+    def compute_ibl(i,j, w=512, h=256):
+        """ given width, height, (i,j) compute the 16x32 ibls """
+        ibl = np.zeros((h,w,1))
+        ibl[j,i] = 1.0
+        ibl = gaussian_filter(ibl, 20)
+        ibl = resize(ibl, (16,32))
+        ibl = ibl/np.max(ibl)
+        return ibl
+    
     mask = np.copy(target_mask_np)
     mask = np.squeeze(to_mask(mask))
     
-    cur_ibl = get_first_ibl()
-    counter = 0
-    with tqdm(total=16 * 32) as tbar:
-        for i in range(16):
-            for j in range(32):
-                out_fname = '{:07d}.png'.format(counter)
-                predict_fname = os.path.join(output_folder, out_fname)                    
-                
-                new_ibl = rotate_ibl(cur_ibl, step=10)
-                new_ibl = cur_ibl + new_ibl * 0.0
-                pred_shadow = predict(target_mask_np, new_ibl)
-                
-                saving_result = pred_shadow
-                saving_result[:16,:32] = 1.0 - new_ibl
-                
-                saving_result[np.where(mask != 0)] = 1.0
-                np.clip(saving_result, 0.0, 1.0, out=saving_result)
-                plt.imsave(predict_fname, mask_to_rgb(saving_result))
-                tbar.update()
+    # cur_ibl = get_first_ibl()
+    counter, prefix = 0, 0
+    w,h = 512,256 
+    sample_num = 40
+    with tqdm(total=w * h/sample_num) as tbar:
+        for j in range(h):
+            for i in range(w):
+                if counter % sample_num == 0:
+                    out_fname = '{:07d}.png'.format(prefix)
+                    predict_fname = os.path.join(output_folder, out_fname)                    
+
+                    # new_ibl = rotate_ibl(cur_ibl, step=10)
+                    # new_ibl = cur_ibl + new_ibl * 0.0
+                    new_ibl = compute_ibl(i,j)
+                    pred_shadow = predict(target_mask_np, new_ibl)
+
+                    saving_result = pred_shadow
+                    saving_result[:16,:32] = 1.0 - new_ibl
+
+                    saving_result[np.where(mask != 0)] = 1.0
+                    np.clip(saving_result, 0.0, 1.0, out=saving_result)
+                    plt.imsave(predict_fname, mask_to_rgb(saving_result))
+                    tbar.update()
+                    
+                    prefix += 1
                 counter += 1
-                cur_ibl = rotate_ibl(cur_ibl)
                 
-            cur_ibl = rotate_ibl(cur_ibl, axis=0)
-            
-    
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--folder', type=str, help='testing images target folder')

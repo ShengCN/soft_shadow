@@ -229,7 +229,7 @@ def train(params):
     model = Relight_SSN(1, 1)    # input is mask + human
     model.to(device)
     optimizer = optim.Adam(model.parameters(), lr=params.lr, betas=(params.beta1, 0.999), eps=1e-5)
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=50)
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=2)
 
     # resume from last saved points
     if params.resume:
