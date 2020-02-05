@@ -59,12 +59,13 @@ class Mask_Transform(object):
         ret[np.where(img > 0.9)] = 1.0
         return ret
 
-
 class SSN_Dataset(Dataset):
     def __init__(self, csv_meta_file, is_training):
         start = time.time()
 
         self.meta_data = pd.read_csv(csv_meta_file, header=None).to_numpy()
+        self.first_init()
+        
         self.is_training = is_training
         self.to_tensor = ToTensor()
         self.mask_transfrom = Mask_Transform()
@@ -90,27 +91,44 @@ class SSN_Dataset(Dataset):
     def __getitem__(self, idx):
         if self.is_training and idx > self.training_num:
             print("error")
-
+        
+        random_range = (0, self.__len__())
         # offset to validation set
         if not self.is_training:
             idx = self.training_num + idx
+            random_range = (self.training_num , self.training_num + self.__len__())
+            
+        def get_data(metadata_row):
+            mask_path, light_path, shadow_path = metadata_row[1], metadata_row[3], metadata_row[2]
+            # convert image to [0.0, 1.0] numpy 
+            mask_img = self.mask_transfrom(Image.open(mask_path))
+            light_img = self.ibl_transform(Image.open(light_path))
+            shadow_img = self.mask_transfrom(Image.open(shadow_path))
+            return mask_img, light_img, shadow_img
         
         path_list = self.meta_data[idx]
+        mask_img, light_img, shadow_img = get_data(path_list)
+        shadow_list, light_list = [shadow_img], [light_img]
         
-        mask_path, light_path, shadow_path = path_list[1], path_list[3], path_list[2]
+        # random ibls
+        seed = idx * 1234 + os.getpid()
+        random.seed(seed)
+        random_ibl_num = random.randint(0,10)
+        random_lists = random.choices(self.meta_data[random_range[0]:random_range[1]],k=random_ibl_num)
         
-        # convert image to [0.0, 1.0]
-        mask_img = self.mask_transfrom(Image.open(mask_path))
-        light_img = self.ibl_transform(Image.open(light_path))
-        shadow_img = 1.0 - self.mask_transfrom(Image.open(shadow_path))
-
-        mask_img, shadow_img, light_img = self.to_tensor(mask_img), self.to_tensor(shadow_img),torch.clamp(self.to_tensor(light_img),0.0,1.0)
+        for new_data in random_lists:
+            _,light,shadow = get_data(new_data)
+            shadow_list.append(shadow)
+            light_list.append(light)
+        
+        light_img, shadow_img = self.render_new_shadow(light_list, shadow_list)
+        mask_img, shadow_img, light_img = self.to_tensor(mask_img), self.to_tensor(shadow_img),torch.clamp(self.to_tensor(1.0 - light_img),0.0,1.0)
 
         return mask_img, light_img, shadow_img
     
     def get_prefix(self, path):
         return path[0:path.find('_')]
-
+    
     # def downsample_light(self, img):
     #
     #     img = gaussian_filter(img, sigma=20)
@@ -126,3 +144,32 @@ class SSN_Dataset(Dataset):
 
     def get_statistics(self):
         return self.stats_keys
+    
+    def first_init(self):
+        key = self.meta_data[0][0]
+        tmp = []
+        for row in self.meta_data:
+            if row[0] == key:
+                tmp.append(row)
+            else:
+                break
+        self.meta_data = tmp
+    
+    def render_new_shadow(self, ibls, shadows):
+        assert len(ibls) == len(shadows)
+        
+        ibl_num = len(ibls)
+        if ibl_num == 1:
+            return ibls[0], shadows[0]
+        
+        ibl_num = float(ibl_num)
+        new_ibl = ibls[0]/ibl_num
+        for i in range(1, int(ibl_num)):
+            new_ibl += ibls[i]/ibl_num
+        
+        new_shadow = shadows[0]/ibl_num
+        for i in range(1, int(ibl_num)):
+            new_shadow += shadows[i]/ibl_num
+        
+        return new_ibl, new_shadow
+            

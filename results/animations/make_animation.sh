@@ -1,4 +1,7 @@
 frame_rate=24
+cd experiments
+ffmpeg -y -r $frame_rate -i %07d.png $1
+cd ..
 cd real_human
 ffmpeg -y -r $frame_rate -i %07d.png $1
 cd ..
