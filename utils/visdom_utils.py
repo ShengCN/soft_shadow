@@ -39,19 +39,30 @@ def decouple_image(mask_shadow):
 
     return mask, shadow
 
+def normalize_img(imgs):
+    b,c,h,w = imgs.shape
+    for i in range(b):
+        imgs[i] = imgs[i]/torch.max(imgs[i])
+    
+    imgs = torch.clamp(imgs, 0.0,1.0)
+    return imgs
+
 def visdom_show_batch(imgs, win_name=None, exp=0, nrow=4, normalize=True):
     cur_viz = get_current_viz(exp)
     if normalize:
-        imgs = imgs/torch.max(imgs)
-
+        imgs = normalize_img(imgs)
+    
+    
     if win_name is None:
         cur_viz.images(imgs, win="batch visualize",nrow=nrow)
     else:
         cur_viz.images(imgs, win=win_name, opts=dict(title=win_name),nrow=nrow)
-
+    
 def visdom_show_light(imgs, win_name=None, exp=0, nrow=2):
     cur_viz = get_current_viz(exp)
-    imgs = torch.clamp(imgs/torch.max(imgs),0.0,1.0)
+    #     imgs = torch.clamp(imgs/torch.max(imgs),0.0,1.0)    
+    
+    imgs = normalize_img(imgs)
     if win_name is None:
         cur_viz.images(imgs, win="batch visualize",nrow=nrow)
     else:

@@ -127,13 +127,14 @@ def training_iteration(model, train_dataloder, optimizer, train_loss, epoch_num)
                 
                 # visualize results
                 if i % 10 == 0:
-                    vis_predicted_img = torch.clamp(predicted_img, 0.0, 1.0).clone().cpu()
+                    vis_predicted_img = predicted_img.detach().cpu()
                     vis_predicted_img_gt = I_t.detach().cpu()
 
                     batch_size, c, h, w = vis_predicted_img.size()
 
                     random_batch = min(4, batch_size)
-                    vis_shadow_img = torch.cat((vis_predicted_img_gt[0:random_batch, :, :, :].view(random_batch, 1, h, w), vis_predicted_img[0:random_batch, :, :, :].view(random_batch,1,h, w)))
+                    vis_shadow_img = torch.cat((vis_predicted_img_gt[0:random_batch, :, :, :].view(random_batch, 1, h, w), 
+                                                vis_predicted_img[0:random_batch, :, :, :].view(random_batch,1,h, w)))
 
                     torchvision.utils.save_image(predicted_img[0:random_batch, 0, :, :].view(random_batch, 1,h, w), "{}_shadow.png".format(exp_name), nrow=4)
                     visdom_show_batch(mask[:random_batch,:,:,:], win_name="train masks", exp=exp)
@@ -182,7 +183,7 @@ def validation_iteration(model, valid_dataloader, valid_loss, epoch_num):
 
                     # visualize results
                     if i % 10 == 0:
-                        vis_predicted_img = torch.clamp(predicted_img, 0.0, 1.0).clone().cpu()
+                        vis_predicted_img = predicted_img.detach().cpu()
                         vis_predicted_img_gt = I_t.detach().cpu()
 
                         batch_size, c, h, w = vis_predicted_img.size()
@@ -229,7 +230,7 @@ def train(params):
     model = Relight_SSN(1, 1)    # input is mask + human
     model.to(device)
     optimizer = optim.Adam(model.parameters(), lr=params.lr, betas=(params.beta1, 0.999), eps=1e-5)
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=2)
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=params.patience)
 
     # resume from last saved points
     if params.resume:

@@ -64,8 +64,7 @@ class SSN_Dataset(Dataset):
         start = time.time()
 
         self.meta_data = pd.read_csv(csv_meta_file, header=None).to_numpy()
-        self.first_init()
-        
+
         self.is_training = is_training
         self.to_tensor = ToTensor()
         self.mask_transfrom = Mask_Transform()
@@ -78,6 +77,7 @@ class SSN_Dataset(Dataset):
         np.random.seed(19950220)
         np.random.shuffle(self.meta_data)
         self.training_num = len(self.meta_data) - int(len(self.meta_data) / 10)
+        self.first_init()
 
     def __len__(self):
         if self.is_training:
@@ -113,8 +113,9 @@ class SSN_Dataset(Dataset):
         # random ibls
         seed = idx * 1234 + os.getpid()
         random.seed(seed)
-        random_ibl_num = random.randint(0,10)
-        random_lists = random.choices(self.meta_data[random_range[0]:random_range[1]],k=random_ibl_num)
+        random_ibl_num = random.randint(0,2)
+        key = os.path.basename(self.meta_data[idx][0])
+        random_lists = random.choices(self.mappings[key],k=random_ibl_num)
         
         for new_data in random_lists:
             _,light,shadow = get_data(new_data)
@@ -122,7 +123,7 @@ class SSN_Dataset(Dataset):
             light_list.append(light)
         
         light_img, shadow_img = self.render_new_shadow(light_list, shadow_list)
-        mask_img, shadow_img, light_img = self.to_tensor(mask_img), self.to_tensor(shadow_img),torch.clamp(self.to_tensor(1.0 - light_img),0.0,1.0)
+        mask_img, shadow_img, light_img = self.to_tensor(mask_img), self.to_tensor(shadow_img),self.to_tensor(light_img)
 
         return mask_img, light_img, shadow_img
     
@@ -146,14 +147,16 @@ class SSN_Dataset(Dataset):
         return self.stats_keys
     
     def first_init(self):
-        key = self.meta_data[0][0]
-        tmp = []
-        for row in self.meta_data:
-            if row[0] == key:
-                tmp.append(row)
+        """ Initialize a hash map: obj_type -> data list"""
+        # import pdb; pdb.set_trace()
+        self.mappings = dict()
+        for r in self.meta_data:
+            key = os.path.basename(r[0]) 
+            if key in self.mappings.keys():
+                self.mappings[key].append(r)
             else:
-                break
-        self.meta_data = tmp
+                self.mappings[key] = []
+                self.mappings[key].append(r)
     
     def render_new_shadow(self, ibls, shadows):
         assert len(ibls) == len(shadows)
@@ -163,13 +166,13 @@ class SSN_Dataset(Dataset):
             return ibls[0], shadows[0]
         
         ibl_num = float(ibl_num)
-        new_ibl = ibls[0]/ibl_num
+        new_ibl = ibls[0]
         for i in range(1, int(ibl_num)):
-            new_ibl += ibls[i]/ibl_num
+            new_ibl += ibls[i]
         
-        new_shadow = shadows[0]/ibl_num
+        new_shadow = shadows[0]
         for i in range(1, int(ibl_num)):
-            new_shadow += shadows[i]/ibl_num
+            new_shadow += shadows[i]
         
         return new_ibl, new_shadow
             

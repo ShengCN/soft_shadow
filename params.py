@@ -43,6 +43,7 @@ def parse_params():
     parser.add_argument('--multi_gpu', action='store_true', help='use multiple GPU training')
     parser.add_argument('--timers', type=int, default=1, help='number of epochs to train for')
     parser.add_argument('--use_schedule', action='store_true',help='use automatic schedule')
+    parser.add_argument('--patience', type=int, default=10, help='use automatic schedule')
     parser.add_argument('--exp_name', type=str, default='l1 loss',help='experiment name')
     parser.add_argument('--new_exp', action='store_true', help='experiment 2')
     parser.add_argument('--bilinear', action='store_true', help='use bilinear in up-stream')

@@ -97,7 +97,7 @@ class Up_Stream(nn.Module):
         self.up_128_128_1 = Conv(128, 64, 1)
 
         self.up_128_256 = Up(128, 32)
-        self.out_conv = Conv(64, out_channels, 1, activation_func='sigmoid')
+        self.out_conv = Conv(64, out_channels, 1, activation_func='relu')
         
     def forward(self, l, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11):
         # tiled_l = torch.cat((l.view(-1, 6, 16, 16).repeat(1, 512 // 6, 1, 1), l.view(-1, 6, 16, 16)[:, 0:2, :, :]), dim=1)
