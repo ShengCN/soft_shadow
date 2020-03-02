@@ -1,3 +1,6 @@
+import sys
+sys.path.append("..")
+
 import os
 import torch
 import numpy as np
@@ -10,12 +13,15 @@ import time
 import random
 from scipy.ndimage.filters import gaussian_filter
 from skimage.transform import resize
+from params import params
 
 class To_Normalized_Img(object):
     """Convert PIL image to [0,1] numpy"""
 
     def __call__(self, img):
-        img = np.array(img)/255.0
+        img = np.array(img)
+        if img.dtype == np.uint8:
+            img = img/255.0
         return img
 
 class ToTensor(object):
@@ -31,7 +37,7 @@ class ToTensor(object):
 class IBL_Transform(object):
     """ IBL transforms before training"""
 
-    # input is PIL img, out put is numpy
+    # input is PIL img, output is numpy
     def __call__(self, img):
         normalize_transform = To_Normalized_Img()
         img = normalize_transform(img)
@@ -76,14 +82,19 @@ class SSN_Dataset(Dataset):
         # fake random
         np.random.seed(19950220)
         np.random.shuffle(self.meta_data)
-        self.training_num = len(self.meta_data) - int(len(self.meta_data) / 10)
         self.first_init()
+        
+        self.training_num = (len(self.meta_data) - int(len(self.meta_data) / 10))
+        
+        parameter = params().get_params()
+        self.ibl_num = parameter.ibl_num
 
     def __len__(self):
         if self.is_training:
             return self.training_num
         else:
-            return len(self.meta_data) - self.training_num
+            # return len(self.meta_data) - self.training_num
+            return self.training_num//10
 
         # exp_one_data
         # return 1
@@ -113,8 +124,11 @@ class SSN_Dataset(Dataset):
         # random ibls
         seed = idx * 1234 + os.getpid()
         random.seed(seed)
-        random_ibl_num = random.randint(0,2)
-        key = os.path.basename(self.meta_data[idx][0])
+        # random_ibl_num = random.randint(0,2)
+        
+        # random_ibl_num = random.randint(0,self.ibl_num)
+        random_ibl_num = self.ibl_num
+        key = (os.path.basename(self.meta_data[idx][0]), self.meta_data[idx][-2])
         random_lists = random.choices(self.mappings[key],k=random_ibl_num)
         
         for new_data in random_lists:
@@ -148,16 +162,26 @@ class SSN_Dataset(Dataset):
     
     def first_init(self):
         """ Initialize a hash map: obj_type -> data list"""
-        # import pdb; pdb.set_trace()
-        self.mappings = dict()
+        
+        tmp_list = []
+        # move those non-human out of current dataset
         for r in self.meta_data:
             key = os.path.basename(r[0]) 
+            if key.find("simulated")==-1:
+                continue
+            tmp_list.append(r)
+        
+        self.meta_data = tmp_list
+        self.mappings = dict()
+        for r in self.meta_data:
+            key = (os.path.basename(r[0]),r[-2]) 
             if key in self.mappings.keys():
                 self.mappings[key].append(r)
             else:
                 self.mappings[key] = []
                 self.mappings[key].append(r)
-    
+        # import pdb; pdb.set_trace()
+        
     def render_new_shadow(self, ibls, shadows):
         assert len(ibls) == len(shadows)
         
@@ -175,4 +199,3 @@ class SSN_Dataset(Dataset):
             new_shadow += shadows[i]
         
         return new_ibl, new_shadow
-            

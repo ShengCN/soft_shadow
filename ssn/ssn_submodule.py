@@ -8,7 +8,7 @@ import torch.nn.functional as F
 from utils.net_utils import compute_differentiable_params
 from params import params
 
-def get_layer_info(out_channels):
+def get_layer_info(out_channels, activation_func='relu'):
     parameter = params().get_params()
     if parameter.norm == 'batch_norm':
         norm_layer = nn.BatchNorm2d(out_channels, momentum=0.9)
@@ -21,9 +21,10 @@ def get_layer_info(out_channels):
         norm_layer = nn.GroupNorm(group_num, out_channels)
     else:
         raise Exception('norm name error')
-        
-    activation_func = nn.ReLU()
-    if parameter.prelu:
+    
+    if activation_func == 'relu':
+        activation_func = nn.ReLU()
+    elif activation_func == 'prelu':
         activation_func = nn.PReLU(out_channels)
         
     return norm_layer, activation_func
@@ -33,7 +34,7 @@ class Conv(nn.Module):
     
     def __init__(self, in_channels, out_channels, conv_stride, activation_func='relu'):
         super().__init__()
-        norm_layer, activation_func = get_layer_info(out_channels)
+        norm_layer, activation_func = get_layer_info(out_channels, activation_func)
         
         self.conv = nn.Sequential(
             nn.Conv2d(in_channels, out_channels,stride=conv_stride, kernel_size=3, padding=1),
@@ -46,13 +47,12 @@ class Conv(nn.Module):
 class Up(nn.Module):
     """ Upscaling then conv """
     
-    def __init__(self, in_channels, out_channels):
+    def __init__(self, in_channels, out_channels, activation_func='relu'):
         super().__init__()
-        norm_layer, activation_func = get_layer_info(out_channels)
-        
-        # import pdb; pdb.set_trace()
         
         parameter = params().get_params()
+        norm_layer, activation_func = get_layer_info(out_channels, activation_func)
+        
         if not parameter.bilinear:
             up_layer = nn.ConvTranspose2d(in_channels, out_channels, kernel_size=2, stride=2)
             self.up = nn.Sequential(
@@ -61,19 +61,19 @@ class Up(nn.Module):
                 activation_func)
         else:
             up_layer = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
-            self.up = nn.Sequential(
-                up_layer,
-                Conv(in_channels, in_channels//2, 1),
-                Conv(in_channels//2, out_channels, 1),
-                norm_layer,
-                activation_func)
-            
-        # self.up = nn.Sequential(
-        #         up_layer,
-        #         nn.BatchNorm2d(out_channels,momentum=0.9),
-        #         nn.ReLU()
-        #     )
-        # self.up = up_layer
+            if parameter.double_conv:
+                self.up = nn.Sequential(
+                    up_layer,
+                    Conv(in_channels, in_channels//2, 1),
+                    Conv(in_channels//2, out_channels, 1),
+                    norm_layer,
+                    activation_func)
+            else:
+                self.up = nn.Sequential(
+                    up_layer,
+                    Conv(in_channels, in_channels//4, 1),
+                    norm_layer,
+                    activation_func)
 
     def forward(self, x):
         return self.up(x)
@@ -83,21 +83,30 @@ class Up_Stream(nn.Module):
     
     def __init__(self, out_channels=3):
         super(Up_Stream, self).__init__()
-        self.up_16_16_1 = Conv(512, 256, 1)
-        self.up_16_16_2 = Conv(768, 512, 1)
-        self.up_16_16_3 = Conv(1024, 512, 1)
+        
+        parameter = params().get_params()
+        if parameter.prelu:
+            activation_func='prelu'
+        else:
+            activation_func='relu'
+        
+        self.up_16_16_1 = Conv(512, 256, 1, activation_func)
+        self.up_16_16_2 = Conv(768, 512, 1, activation_func)
+        self.up_16_16_3 = Conv(1024, 512, 1, activation_func)
 
-        self.up_16_32 = Up(1024, 256)
-        self.up_32_32_1 = Conv(512, 256, 1)
+        self.up_16_32 = Up(1024, 256, activation_func)
+        self.up_32_32_1 = Conv(512, 256, 1, activation_func)
 
-        self.up_32_64 = Up(512, 128)
-        self.up_64_64_1 = Conv(256, 128, 1)
+        self.up_32_64 = Up(512, 128, activation_func)
+        self.up_64_64_1 = Conv(256, 128, 1, activation_func)
 
-        self.up_64_128 = Up(256, 64)
-        self.up_128_128_1 = Conv(128, 64, 1)
+        self.up_64_128 = Up(256, 64, activation_func)
+        self.up_128_128_1 = Conv(128, 64, 1, activation_func)
 
-        self.up_128_256 = Up(128, 32)
+        self.up_128_256 = Up(128, 32, activation_func)
         self.out_conv = Conv(64, out_channels, 1, activation_func='relu')
+        
+        # import pdb; pdb.set_trace()
         
     def forward(self, l, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11):
         # tiled_l = torch.cat((l.view(-1, 6, 16, 16).repeat(1, 512 // 6, 1, 1), l.view(-1, 6, 16, 16)[:, 0:2, :, :]), dim=1)

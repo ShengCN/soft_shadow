@@ -68,7 +68,7 @@ def spherical_loss(gt_img, pred_img):
 
 def reconstruct_loss(gt_img, pred_img):
     """ M * (I-I') """
-    return torch.norm((gt_img - pred_img), 2)
+    return torch.norm(gt_img-pred_img, 2)
 
 def loss_functions(ty, sl, sy, gt_ty, gt_sl, gt_sy):
     """ Loss Function:
@@ -141,14 +141,19 @@ def training_iteration(model, train_dataloder, optimizer, train_loss, epoch_num)
                     visdom_show_batch(vis_shadow_img, win_name="train shadow gt vs. inference", exp=exp)
                     
                 # keep tracking
-                train_loss.append(loss.item() / params.batch_size)
+                train_loss.append(loss.item()/np.sqrt(params.batch_size))
+                
+#                 for i in range(batch_size):
+#                     print('batch {}, loss: {}'.format(i, reconstruct_loss(I_t[i:i+1,:,:,:], predicted_img[i:i+1,:,:,:])))
 
+#                 import pdb; pdb.set_trace()
+                    
                 visdom_plot_loss("train_total_loss", train_loss, exp)
 
                 t.update()
 
     # Finish one epoch
-    cur_epoch_loss /= (params.timers * len(train_dataloder) * params.batch_size)
+    cur_epoch_loss /= (params.timers * len(train_dataloder) * np.sqrt(params.batch_size))
     return cur_epoch_loss
 
 def validation_iteration(model, valid_dataloader, valid_loss, epoch_num):
@@ -200,13 +205,13 @@ def validation_iteration(model, valid_dataloader, valid_loss, epoch_num):
                         visdom_show_batch(vis_shadow_img, win_name="valid shadow gt vs. inference", exp=exp)
                         
                     # keep tracking
-                    valid_loss.append(loss.item() / params.batch_size)
+                    valid_loss.append(loss.item()/np.sqrt(params.batch_size))
 
                     visdom_plot_loss("valid_total_loss", valid_loss, exp)
                     t.update()
 
     # Finish one epoch
-    cur_epoch_loss /= (params.timers * len(valid_dataloader) * params.batch_size) 
+    cur_epoch_loss /= (params.timers * len(valid_dataloader) * np.sqrt(params.batch_size)) 
     return cur_epoch_loss
 
 def train(params):
@@ -244,7 +249,11 @@ def train(params):
         hist_train_loss = checkpoint['hist_train_loss']
         hist_valid_loss = checkpoint['hist_valid_loss']
         print("resuming from: {}".format(best_weight))
-
+    
+    
+    if params.relearn:
+        best_valid_loss = float('inf')
+    
     print(torch.cuda.device_count())
     # test multiple GPUs
     if torch.cuda.device_count() > 1 and params.multi_gpu:

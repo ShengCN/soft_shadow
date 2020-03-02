@@ -28,11 +28,11 @@ import random
 params = options().get_params()
 print(params)
 
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 # device = torch.device("cpu")
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print("Device: ", device)
 model = Relight_SSN(1,1)
-weight_file = os.path.join('weights', 'bilinear_groupnorm_05-February-12-30-PM.pt')
+weight_file = os.path.join('weights', 'l1 loss_21-February-09-23-AM.pt')
 checkpoint = torch.load(weight_file, map_location=device)    
 model.to(device)
 model.load_state_dict(checkpoint['model_state_dict'])
@@ -40,19 +40,6 @@ model.load_state_dict(checkpoint['model_state_dict'])
 def to_one_batch(img_tensor):
     c,h,w = img_tensor.size()
     return img_tensor.view(1,c,h,w)
-
-def get_trnsf():
-    img_trnsf = transforms.Compose([
-        Mask_Transform(),
-        ToTensor()
-    ])
-    
-    ibl_trnsf = transforms.Compose([
-        IBL_Transform(),
-        ToTensor()
-    ])
-    
-    return img_trnsf, ibl_trnsf
 
 def mask_to_rgb(mask_np):
     dimension = mask_np.shape
@@ -81,7 +68,7 @@ def save_results(img_batch, out_path):
 
 def predict(img, ibl_img):
     """ Predict results for a numpy img(png image using alpha channel to represent mask) + ibl numpy img
-        img: w x h x 3 image
+        img: w x h x 3 image, [0,255]
         ibl_img: [0,1.0]
     """
     img_trnsf = transforms.Compose([
@@ -109,52 +96,37 @@ def predict(img, ibl_img):
         predicted_img = predicted_img[0].detach().cpu().numpy()
         predicted_img = predicted_img[0].transpose((1,2,0))
         return predicted_img
+
+def compute_ibl(i,j, w=512, h=256):
+    """ given width, height, (i,j) compute the 16x32 ibls """
+    ibl = np.zeros((h,w,1))
+    ibl[j,i] = 1.0
+    ibl = gaussian_filter(ibl, 20)
+    ibl = resize(ibl, (16,32))
+    ibl = ibl/np.max(ibl)
+    return ibl.reshape(16,32,1)
+
+def merge_result(pixel_img, mask_img, shadow_result):
+    """ pixel image, mask image may in [0, 255]
+    """
+    if pixel_img.dtype == np.uint8:
+        pixel_img = pixel_img/255.0
+        
+    if mask_img.dtype == np.uint8:
+        mask_img = mask_img/255.0
     
-def predict_testing_results(input_folder, output_folder):
-    """ Given a testing set folder(real humans), predict results from that folder"""
+#     print(pixel_img.shape)
+#     print(mask_img.shape)
+#     print(shadow_result.shape)
     
-#     img_files = [f for f in os.listdir(input_folder) if os.path.isfile(os.path.join(input_folder, f))]
-#     print('Predict {} files'.format(len(img_files)))
+    h,w, c = shadow_result.shape
+    merged_img = np.zeros((h,w,3))
+    merged_img[:,:,0], merged_img[:,:,1], merged_img[:,:,2] = np.squeeze(shadow_result), np.squeeze(shadow_result), np.squeeze(shadow_result)
+    merged_img[np.where(mask_img > 0.3)] = pixel_img[np.where(mask_img > 0.3)]
+    return merged_img
 
-#     def real_to_mask(img):
-#         # print(np.max(img))
-#         h, w, c = img.shape
-#         mask = np.zeros((h, w, 3), dtype=np.uint8)
-#         mask[:, :, 0], mask[:, :, 1], mask[:, :, 2] = img[:, :, 3], img[:, :, 3], img[:, :, 3]
-
-#         # print(np.max(mask))
-
-#         return mask
-
-#     testing_ibl_file = os.path.join('/home/ysheng/Dataset/soft_shadow/train/notsimulated_combine_male_short_outfits_genesis8_armani_casualoutfit03_Base_Pose_Standing_A/imgs','00000000_light.png')
-#     testing_ibl = Image.open(testing_ibl_file)
-#     testing_ibl_tensor = to_one_batch(ibl_trnsf(testing_ibl)).to(device)
-
-#     model.eval()
-#     with torch.no_grad():
-#         for file in img_files:
-#             # print(file)
-#             # print(input_folder)
-#             file_path = os.path.join(input_folder, file)
-#             img = np.array(Image.open(file_path))
-#             img = real_to_mask(img)
-#             # import pdb; pdb.set_trace()
-#             mask_tensor = to_one_batch(img_trnsf(img))
-#             I_s = torch.cat((mask_tensor, mask_tensor), dim=1).to(device)
-#             L_t = testing_ibl_tensor
-#             predicted_img, predicted_ibl = model(I_s, L_t)
-#             save_results(predicted_img, os.path.join(output_folder, os.path.splitext(file)[0] + ".png"))
-    print('not modified yet')
-    
-def render_animation(target_mask_np, output_folder, light_folder=""):
+def render_animation(target_img, target_mask_np, output_folder, ibl_num=1):
     """ Given a mask(w x h x 3, uint8), render a sequence of images for making an animation"""
-    def get_first_ibl():
-        tmp_np = np.zeros((256,512,1))
-        tmp_np[0, 0] = 1.0
-        tmp_np = gaussian_filter(tmp_np, 20)
-        tmp_np = resize(tmp_np, (16,32))
-        tmp_np = tmp_np/np.max(tmp_np) 
-        return tmp_np
     
     def rotate_ibl(img_np, axis=1, step=1):
         """ rotate ibl along one axis for one pixel """
@@ -176,46 +148,93 @@ def render_animation(target_mask_np, output_folder, light_folder=""):
         target_mask_np = resize(target_mask_np, (256,256,1))
         return target_mask_np
     
-    def compute_ibl(i,j, w=512, h=256):
-        """ given width, height, (i,j) compute the 16x32 ibls """
-        ibl = np.zeros((h,w,1))
-        ibl[j,i] = 1.0
-        ibl = gaussian_filter(ibl, 20)
-        ibl = resize(ibl, (16,32))
-        ibl = ibl/np.max(ibl)
-        return ibl
-    
-    def render_save(target_mask_np, ibl, predict_fname):
-        mask = np.copy(target_mask_np)
-        mask = np.squeeze(to_mask(mask))
-    
-        pred_shadow = predict(target_mask_np, ibl)
-        saving_result = pred_shadow
-        saving_result[:16,:32] = 1.0 - ibl
-        saving_result[mask != 0] = 1.0
+    def merge_save(target_img, target_mask_np, ibl, shadow_result,predict_fname):
+        saving_result = merge_result(target_img, target_mask_np, shadow_result)
         
+        saving_result[:16,:32] = 1.0 - ibl
         np.clip(saving_result, 0.0, 1.0, out=saving_result)
-        plt.imsave(predict_fname, mask_to_rgb(saving_result))
+        plt.imsave(predict_fname, saving_result)
+
+    def batch_predict(img, ibl_img):
+        """ Predict results for a numpy img(png image using alpha channel to represent mask) + ibl numpy img
+            img: batch x w x h x 3 image, [0,255]
+            ibl_img: [0,1.0]
+        """
+        b, h, w, c = img.shape
+        batch_img = torch.zeros([b,1,h,w])
+        
+        b, h, w, c = ibl_img.shape
+        batch_ibl = torch.zeros([b,c,h,w])
+        
+        img_trnsf = transforms.Compose([
+            Mask_Transform(),
+            ToTensor()
+        ])
+        ibl_trnsf = transforms.Compose([
+            # IBL_Transform(),
+            ToTensor()
+        ])
+
+        for i in range(b):
+            batch_img[i,:,:,:] = img_trnsf(img[i,:,:,:])
+            batch_ibl[i,:,:,:] = ibl_trnsf(ibl_img[i,:,:,:])
+            
+        model.eval()
+        with torch.no_grad():
+            I_s = batch_img.to(device)
+            L_t = batch_ibl.to(device)
+            predicted_img,_ = model(I_s, L_t)
+            predicted_img = predicted_img.detach().cpu().numpy()
+            predicted_img = predicted_img.transpose((0, 2, 3, 1))
+            return predicted_img
     
+    batch_size, batch_counter = 80, 0
+    predict_fname_list = []
+
     # cur_ibl = get_first_ibl()
     counter, prefix = 0, 0
-    w,h = 512,256 
-    i_range, j_range = w, 1
-    row_ind = int(256 * 0.6);
-    
+    batch_ibl = np.zeros((batch_size, 16, 32, 1))
+
+    h,w,c = target_img.shape
+    batch_mask_img = np.array([target_mask_np,] * batch_size)
+
+    i_range = 512
+    j_begin, j_end, j_step = 150, 190, 10
+    j_range = (j_end - j_begin) // j_step
     with tqdm(total= i_range * j_range) as tbar:
-        for j in range(j_range):
+        for j in range(j_begin, j_end, j_step):
             for i in range(i_range):
-                ibl = compute_ibl(i, j + row_ind)
-                ibl = ibl + compute_ibl(w-1-i, j * 2 + row_ind)
-                np.clip(ibl, 0.0, 1.0, out=ibl)
+                batch_counter += 1
+                prefix += 1
+
+                ibl = compute_ibl(i, j)
+                if ibl_num == 2:
+                    second_ibl = compute_ibl(i_range-i, j)
+                    ibl += second_ibl
+                
+                batch_ibl[batch_counter-1,:,:,:] = ibl
                 out_fname = '{:07d}.png'.format(prefix)
                 predict_fname = os.path.join(output_folder, out_fname)
-                    
-                render_save(target_mask_np, ibl, predict_fname)
-                prefix += 1
+
+                predict_fname_list.append(predict_fname)
+                if batch_counter == batch_size:
+                    # batch predict results
+                    batch_predict_result = batch_predict(batch_mask_img, batch_ibl)
+
+                    # save each batch results
+                    for bi in range(batch_size):
+                        predict_result = batch_predict_result[bi]
+
+                        # normalize to [0,1]
+                        predict_result = predict_result / ibl_num
+                        predict_result = np.clip(predict_result, 0.0, 1.0)
+
+                        merge_save(target_img, target_mask_np, batch_ibl[bi], predict_result, predict_fname_list[bi])
+
+                    batch_counter = 0
+                    predict_fname_list = []
+
                 tbar.update()
-            
             
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

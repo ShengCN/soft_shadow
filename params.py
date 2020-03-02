@@ -8,12 +8,17 @@ class params():
             self.norm = 'group_norm'
             self.activation = 'relu'
             self.bilinear = True
-            self.prelu = False
+            self.prelu = True
+            self.double_conv = True
+            self.ibl_num = 2
             
         def set_params(self, options):
             self.options = options
             self.norm = options.norm
             self.bilinear = options.bilinear
+            self.prelu = options.prelu
+            self.double_conv = options.double_conv
+            self.ibl_num = options.ibl_num
             
         def __str__(self):
             return 'norm: {} bilinear: {} activation: {}'.format(self.norm, self.bilinear, self.activation)
@@ -39,6 +44,7 @@ def parse_params():
     parser.add_argument('--lr', type=float, default=0.003, help='learning rate, default=0.005')
     parser.add_argument('--beta1', type=float, default=0.9, help='momentum for SGD, default=0.9')
     parser.add_argument('--resume', action='store_true', help='resume training')
+    parser.add_argument('--relearn', action='store_true', help='forget previous best validation loss')
     parser.add_argument('--weight_file',type=str,  help='weight file')
     parser.add_argument('--multi_gpu', action='store_true', help='use multiple GPU training')
     parser.add_argument('--timers', type=int, default=1, help='number of epochs to train for')
@@ -48,6 +54,9 @@ def parse_params():
     parser.add_argument('--new_exp', action='store_true', help='experiment 2')
     parser.add_argument('--bilinear', action='store_true', help='use bilinear in up-stream')
     parser.add_argument('--norm', type=str, default='batch_norm', help='use group norm')
+    parser.add_argument('--prelu', action='store_true', help='use group norm')
+    parser.add_argument('--double_conv', action='store_true', help='use group norm')
+    parser.add_argument('--ibl_num', type=int, default=2, help='maximum ibl number during training')
     
     # parser.add_argument('--cpu', action='store_true', help='Force training on CPU')
     arguments = parser.parse_args()

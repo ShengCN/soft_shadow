@@ -41,9 +41,13 @@ def decouple_image(mask_shadow):
 
 def normalize_img(imgs):
     b,c,h,w = imgs.shape
-    for i in range(b):
-        imgs[i] = imgs[i]/torch.max(imgs[i])
-    
+    gt_batch = b//2
+    for i in range(gt_batch):
+        factor = torch.max(imgs[i])
+        imgs[i] = imgs[i]/factor
+        imgs[gt_batch + i] = imgs[gt_batch + i]/factor
+        # imgs[i] = imgs[i]/3.0
+        
     imgs = torch.clamp(imgs, 0.0,1.0)
     return imgs
 
