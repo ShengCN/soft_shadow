@@ -236,7 +236,9 @@ def train(params):
     model.to(device)
     optimizer = optim.Adam(model.parameters(), lr=params.lr, betas=(params.beta1, 0.999), eps=1e-5)
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=params.patience)
-
+    
+#     import pdb;pdb.set_trace()
+    
     # resume from last saved points
     if params.resume:
         # print("Not implemented yet, remember to implement")

@@ -32,7 +32,7 @@ print(params)
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print("Device: ", device)
 model = Relight_SSN(1,1)
-weight_file = os.path.join('weights', 'l1 loss_21-February-09-23-AM.pt')
+weight_file = os.path.join('weights', 'l1 loss_06-March-03-52-PM.pt')
 checkpoint = torch.load(weight_file, map_location=device)    
 model.to(device)
 model.load_state_dict(checkpoint['model_state_dict'])
@@ -188,7 +188,7 @@ def render_animation(target_img, target_mask_np, output_folder, ibl_num=1):
             predicted_img = predicted_img.transpose((0, 2, 3, 1))
             return predicted_img
     
-    batch_size, batch_counter = 80, 0
+    batch_size, batch_counter = 40, 0
     predict_fname_list = []
 
     # cur_ibl = get_first_ibl()
@@ -209,8 +209,14 @@ def render_animation(target_img, target_mask_np, output_folder, ibl_num=1):
 
                 ibl = compute_ibl(i, j)
                 if ibl_num == 2:
-                    second_ibl = compute_ibl(i_range-i, j)
+                    second_ibl = compute_ibl(i_range-i-1, j)
                     ibl += second_ibl
+                
+                if ibl_num == 3:
+                    second_ibl = compute_ibl(i_range-i-1, j)
+                    ibl += second_ibl
+                    third_ibl = compute_ibl(i//2 + (i_range-i-1)//2, j)
+                    ibl += third_ibl
                 
                 batch_ibl[batch_counter-1,:,:,:] = ibl
                 out_fname = '{:07d}.png'.format(prefix)
@@ -237,16 +243,10 @@ def render_animation(target_img, target_mask_np, output_folder, ibl_num=1):
                 tbar.update()
             
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--folder', type=str, help='testing images target folder')
-    parser.add_argument('--out_folder', type=str, help='output folder')
-
-    params = parser.parse_args()
-    print('Params: {}'.format(params))
-    predict_testing_results(params.folder, params.out_folder)
-
+    pass
     # testing_ibl_file = os.path.join('/home/ysheng/Dataset/soft_shadow/single_human/notsimulated_combine_male_short_outfits_genesis8_armani_casualoutfit03_Base_Pose_Standing_A','00000000_light.png')
     # testing_img = '/home/ysheng/Dataset/soft_shadow/real_human_testing_set/warrior-2-1.png'
     # img, ibl_img = plt.imread(testing_img), plt.imread(testing_ibl_file)
     # shadow_img = predict(img, ibl_img)
     # plt.imsave("testing.png",shadow_img)
+    

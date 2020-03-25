@@ -126,8 +126,8 @@ class SSN_Dataset(Dataset):
         random.seed(seed)
         # random_ibl_num = random.randint(0,2)
         
-        # random_ibl_num = random.randint(0,self.ibl_num)
-        random_ibl_num = self.ibl_num
+        random_ibl_num = random.randint(0,self.ibl_num)
+        # random_ibl_num = self.ibl_num
         key = (os.path.basename(self.meta_data[idx][0]), self.meta_data[idx][-2])
         random_lists = random.choices(self.mappings[key],k=random_ibl_num)
         
@@ -181,21 +181,24 @@ class SSN_Dataset(Dataset):
                 self.mappings[key] = []
                 self.mappings[key].append(r)
         # import pdb; pdb.set_trace()
-        
+    
     def render_new_shadow(self, ibls, shadows):
         assert len(ibls) == len(shadows)
         
-        ibl_num = len(ibls)
-        if ibl_num == 1:
-            return ibls[0], shadows[0]
+        ibl_channel = self.ibl_num + 1
+        h,w,c = ibls[0].shape
+        new_ibl = np.zeros((h, w, ibl_channel), dtype=ibls[0].dtype) 
+
+        for i in range(len(ibls)):
+            new_ibl[:,:,i] = np.squeeze(ibls[i]) 
         
-        ibl_num = float(ibl_num)
-        new_ibl = ibls[0]
-        for i in range(1, int(ibl_num)):
-            new_ibl += ibls[i]
+        # shuffle channel
+        new_ibl = np.transpose(new_ibl,(2,0,1))
+        np.random.shuffle(new_ibl)
+        new_ibl = np.transpose(new_ibl, (1,2,0))
         
         new_shadow = shadows[0]
-        for i in range(1, int(ibl_num)):
+        for i in range(len(shadows)):
             new_shadow += shadows[i]
         
         return new_ibl, new_shadow

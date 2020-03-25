@@ -20,7 +20,7 @@ def convert_Relight_latent_light(latent_feature):
 def show_batch(sample_batch, out_file=None):
     grid = utils.make_grid(sample_batch)
     plt.figure(figsize=(30,20))
-    plt.imshow(grid.detach().numpy().transpose((1,2,0)))
+    plt.imshow(grid.detach().cpu().numpy().transpose((1,2,0)))
 
     if not out_file is None:
         print('try save ', out_file)
