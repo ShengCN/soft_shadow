@@ -92,7 +92,7 @@ class Up_Stream(nn.Module):
         else:
             activation_func='relu'
 
-        self.ibl_num = parameter.ibl_num + 1
+        self.ibl_num = parameter.ibl_num
         
         input_channel = 512 * self.ibl_num
         self.up_16_16_1 = Conv(input_channel, 256, 1, activation_func)

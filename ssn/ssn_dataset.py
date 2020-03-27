@@ -126,19 +126,24 @@ class SSN_Dataset(Dataset):
         random.seed(seed)
         # random_ibl_num = random.randint(0,2)
         
-        random_ibl_num = random.randint(0,self.ibl_num)
-        # random_ibl_num = self.ibl_num
-        key = (os.path.basename(self.meta_data[idx][0]), self.meta_data[idx][-2])
+        random_ibl_num = random.randint(0,self.ibl_num-1)
+        key = (os.path.basename(self.meta_data[idx][0]), self.meta_data[idx][-1],self.meta_data[idx][-2])
         random_lists = random.choices(self.mappings[key],k=random_ibl_num)
         
         for new_data in random_lists:
             _,light,shadow = get_data(new_data)
             shadow_list.append(shadow)
             light_list.append(light)
-        
-        light_img, shadow_img = self.render_new_shadow(light_list, shadow_list)
-        mask_img, shadow_img, light_img = self.to_tensor(mask_img), self.to_tensor(shadow_img),self.to_tensor(light_img)
 
+        light_img, shadow_img = self.render_new_shadow(light_list, shadow_list)
+        
+        # print('random num: {}, list size: {}, shadow size: {}'.format(random_ibl_num,  len(light_list),  len(shadow_list)))
+        # self.get_min_max(light_img,'light')
+        # self.get_min_max(shadow_img,'shadow')
+        
+        mask_img, shadow_img, light_img = self.to_tensor(mask_img), self.to_tensor(shadow_img),self.to_tensor(light_img)
+        
+        
         return mask_img, light_img, shadow_img
     
     def get_prefix(self, path):
@@ -174,7 +179,8 @@ class SSN_Dataset(Dataset):
         self.meta_data = tmp_list
         self.mappings = dict()
         for r in self.meta_data:
-            key = (os.path.basename(r[0]),r[-2]) 
+            # model, rotation, camera position
+            key = (os.path.basename(r[0]), r[-1], r[-2]) 
             if key in self.mappings.keys():
                 self.mappings[key].append(r)
             else:
@@ -185,11 +191,12 @@ class SSN_Dataset(Dataset):
     def render_new_shadow(self, ibls, shadows):
         assert len(ibls) == len(shadows)
         
-        ibl_channel = self.ibl_num + 1
+        ibl_channel = self.ibl_num 
         h,w,c = ibls[0].shape
         new_ibl = np.zeros((h, w, ibl_channel), dtype=ibls[0].dtype) 
 
         for i in range(len(ibls)):
+            # self.get_min_max(ibls[i], 'channel {}'.format(i))
             new_ibl[:,:,i] = np.squeeze(ibls[i]) 
         
         # shuffle channel
@@ -198,7 +205,10 @@ class SSN_Dataset(Dataset):
         new_ibl = np.transpose(new_ibl, (1,2,0))
         
         new_shadow = shadows[0]
-        for i in range(len(shadows)):
+        for i in range(1, len(shadows)):
             new_shadow += shadows[i]
         
         return new_ibl, new_shadow
+    
+    def get_min_max(self, batch_data, name):
+        print('{} min: {}, max: {}'.format(name, np.min(batch_data), np.max(batch_data)))

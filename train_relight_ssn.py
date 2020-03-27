@@ -244,14 +244,14 @@ def train(params):
         # print("Not implemented yet, remember to implement")
         # best_weight = "weights/cross entropy loss_04-December-07-56-PM.pt"
         best_weight = os.path.join("weights", params.weight_file)
-        checkpoint = torch.load(best_weight)
+        checkpoint = torch.load(best_weight, map_location=device)
         model.load_state_dict(checkpoint['model_state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         best_valid_loss = checkpoint['best_loss']
         hist_train_loss = checkpoint['hist_train_loss']
         hist_valid_loss = checkpoint['hist_valid_loss']
         print("resuming from: {}".format(best_weight))
-    
+        del checkpoint
     
     if params.relearn:
         best_valid_loss = float('inf')
