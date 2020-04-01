@@ -34,8 +34,12 @@ class Conv(nn.Module):
     
     def __init__(self, in_channels, out_channels, conv_stride, activation_func='relu'):
         super().__init__()
-        norm_layer, activation_func = get_layer_info(out_channels, activation_func)
         
+        parameter = params().get_params()
+        if parameter.prelu:
+            activation_func = 'prelu'
+            
+        norm_layer, activation_func = get_layer_info(out_channels, activation_func)
         self.conv = nn.Sequential(
             nn.Conv2d(in_channels, out_channels,stride=conv_stride, kernel_size=3, padding=1),
             norm_layer,

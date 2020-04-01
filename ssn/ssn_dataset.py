@@ -115,7 +115,7 @@ class SSN_Dataset(Dataset):
             mask_img = self.mask_transfrom(Image.open(mask_path))
             light_img = self.ibl_transform(Image.open(light_path))
             shadow_img = self.mask_transfrom(Image.open(shadow_path))
-            return mask_img, light_img, shadow_img
+            return mask_img, light_img, 1.0 - shadow_img
         
         path_list = self.meta_data[idx]
         mask_img, light_img, shadow_img = get_data(path_list)
@@ -127,7 +127,7 @@ class SSN_Dataset(Dataset):
         # random_ibl_num = random.randint(0,2)
         
         random_ibl_num = random.randint(0,self.ibl_num-1)
-        key = (os.path.basename(self.meta_data[idx][0]), self.meta_data[idx][-1],self.meta_data[idx][-2])
+        key = (os.path.basename(self.meta_data[idx][0]), self.meta_data[idx][-3],self.meta_data[idx][-2])
         random_lists = random.choices(self.mappings[key],k=random_ibl_num)
         
         for new_data in random_lists:
@@ -180,7 +180,7 @@ class SSN_Dataset(Dataset):
         self.mappings = dict()
         for r in self.meta_data:
             # model, rotation, camera position
-            key = (os.path.basename(r[0]), r[-1], r[-2]) 
+            key = (os.path.basename(r[0]), r[-3],r[-2]) 
             if key in self.mappings.keys():
                 self.mappings[key].append(r)
             else:

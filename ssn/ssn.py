@@ -12,11 +12,14 @@ class Relight_SSN(nn.Module):
         super(Relight_SSN, self).__init__()
         
         # import pdb; pdb.set_trace()
-        norm_layer, activation_func = get_layer_info(32 - n_channels)
-        
+        parameter = params().get_params()
+        if parameter.prelu:
+            activation_func = 'prelu'
+            
+        norm_layer, activation_func = get_layer_info(32 - n_channels, activation_func)
+
+        # norm_layer, activation_func = get_layer_info(32 - n_channels)
         # norm_layer = nn.BatchNorm2d(32 - n_channels, momentum=0.9)
-        
-        # import pdb; pdb.set_trace()
         self.in_conv = nn.Sequential(
             nn.Conv2d(n_channels, 32 - n_channels, kernel_size=7, padding=3),
             norm_layer,

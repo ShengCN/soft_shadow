@@ -114,7 +114,7 @@ def training_iteration(model, train_dataloder, optimizer, train_loss, epoch_num)
 
                 optimizer.zero_grad()
                 
-                # predict 
+                # predict
                 predicted_img, predicted_src_light = model(I_s, L_t)
 
                 # compute loss
@@ -139,6 +139,7 @@ def training_iteration(model, train_dataloder, optimizer, train_loss, epoch_num)
                     torchvision.utils.save_image(predicted_img[0:random_batch, 0, :, :].view(random_batch, 1,h, w), "{}_shadow.png".format(exp_name), nrow=4)
                     visdom_show_batch(mask[:random_batch,:,:,:], win_name="train masks", exp=exp)
                     visdom_show_batch(vis_shadow_img, win_name="train shadow gt vs. inference", exp=exp)
+                    visdom_show_batch(L_t[:random_batch,:,:,:], win_name='light', exp=exp, normalize=False)
                     
                 # keep tracking
                 train_loss.append(loss.item()/np.sqrt(params.batch_size))

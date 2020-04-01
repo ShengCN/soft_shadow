@@ -32,7 +32,8 @@ def render_worker(path_relative_vec):
     img = render_shadow(relative_vec)
     plt.imsave(light_path, img)
 
-if __name__ == '__main__':
+    
+def parallel_render():
     dataset_folder = '/home/ysheng/Dataset/soft_shadow/train'
     out_file = os.path.join(dataset_folder, "metadata.csv")
     with open(out_file) as f:
@@ -49,3 +50,7 @@ if __name__ == '__main__':
         # working_fn = partial(batch_working_process, src_folder, out_folder)
         for i, _ in enumerate(pool.imap_unordered(render_worker, zip(mask_path_list, rel_vec_list)), 1):
             print("Finished: {} \r".format(float(i)/task_num), flush=True, end='')
+
+if __name__ == '__main__':
+    parallel_render()
+    

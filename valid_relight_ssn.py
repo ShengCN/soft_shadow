@@ -32,7 +32,7 @@ print(params)
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print("Device: ", device)
 model = Relight_SSN(1,1)
-weight_file = os.path.join('weights', 'l1 loss_06-March-03-52-PM.pt')
+weight_file = os.path.join('weights', 'l1 loss_28-March-10-59-PM.pt')
 checkpoint = torch.load(weight_file, map_location=device)    
 model.to(device)
 model.load_state_dict(checkpoint['model_state_dict'])
@@ -104,7 +104,7 @@ def compute_ibl(i,j, w=512, h=256):
     ibl = gaussian_filter(ibl, 20)
     ibl = resize(ibl, (16,32))
     ibl = ibl/np.max(ibl)
-    return ibl.reshape(16,32,1)
+    return np.squeeze(ibl)
 
 def merge_result(pixel_img, mask_img, shadow_result):
     """ pixel image, mask image may in [0, 255]
@@ -151,7 +151,13 @@ def render_animation(target_img, target_mask_np, output_folder, ibl_num=1):
     def merge_save(target_img, target_mask_np, ibl, shadow_result,predict_fname):
         saving_result = merge_result(target_img, target_mask_np, shadow_result)
         
-        saving_result[:16,:32] = 1.0 - ibl
+        tmp = (ibl[:,:,0] + ibl[:,:,1] + ibl[:,:,2])
+        h,w = tmp.shape
+        ibl_vis = np.zeros((h,w,3), dtype=np.float)
+        ibl_vis[:,:,0],ibl_vis[:,:,1],ibl_vis[:,:,2] = tmp,tmp, tmp
+        np.clip(ibl_vis, 0.0,1.0,out=ibl_vis)
+        saving_result[:16,:32] = 1.0 - ibl_vis
+        
         np.clip(saving_result, 0.0, 1.0, out=saving_result)
         plt.imsave(predict_fname, saving_result)
 
@@ -193,7 +199,7 @@ def render_animation(target_img, target_mask_np, output_folder, ibl_num=1):
 
     # cur_ibl = get_first_ibl()
     counter, prefix = 0, 0
-    batch_ibl = np.zeros((batch_size, 16, 32, 1))
+    batch_ibl = np.zeros((batch_size, 16, 32, 3))
 
     h,w,c = target_img.shape
     batch_mask_img = np.array([target_mask_np,] * batch_size)
@@ -208,17 +214,24 @@ def render_animation(target_img, target_mask_np, output_folder, ibl_num=1):
                 prefix += 1
 
                 ibl = compute_ibl(i, j)
+                h,w = ibl.shape
+                
+                input_ibl = np.zeros((h,w,3), dtype=ibl.dtype)
+                input_ibl[:,:,0] = ibl
                 if ibl_num == 2:
                     second_ibl = compute_ibl(i_range-i-1, j)
-                    ibl += second_ibl
+                    input_ibl[:,:,1] = second_ibl
+                    
                 
                 if ibl_num == 3:
                     second_ibl = compute_ibl(i_range-i-1, j)
-                    ibl += second_ibl
+                    input_ibl[:,:,1] = second_ibl
+                    
                     third_ibl = compute_ibl(i//2 + (i_range-i-1)//2, j)
-                    ibl += third_ibl
+                    input_ibl[:,:,2] = third_ibl
+                    
                 
-                batch_ibl[batch_counter-1,:,:,:] = ibl
+                batch_ibl[batch_counter-1,:,:,:] = input_ibl
                 out_fname = '{:07d}.png'.format(prefix)
                 predict_fname = os.path.join(output_folder, out_fname)
 
