@@ -115,7 +115,7 @@ class SSN_Dataset(Dataset):
             mask_img = self.mask_transfrom(Image.open(mask_path))
             light_img = self.ibl_transform(Image.open(light_path))
             shadow_img = self.mask_transfrom(Image.open(shadow_path))
-            return mask_img, light_img, 1.0 - shadow_img
+            return mask_img, light_img, 1.0-shadow_img
         
         path_list = self.meta_data[idx]
         mask_img, light_img, shadow_img = get_data(path_list)
@@ -191,23 +191,25 @@ class SSN_Dataset(Dataset):
     def render_new_shadow(self, ibls, shadows):
         assert len(ibls) == len(shadows)
         
-        ibl_channel = self.ibl_num 
-        h,w,c = ibls[0].shape
-        new_ibl = np.zeros((h, w, ibl_channel), dtype=ibls[0].dtype) 
+#         ibl_channel = self.ibl_num 
+#         h,w,c = ibls[0].shape
+#         new_ibl = np.zeros((h, w, ibl_channel), dtype=ibls[0].dtype) 
 
-        for i in range(len(ibls)):
-            # self.get_min_max(ibls[i], 'channel {}'.format(i))
-            new_ibl[:,:,i] = np.squeeze(ibls[i]) 
+#         for i in range(len(ibls)):
+#             # self.get_min_max(ibls[i], 'channel {}'.format(i))
+#             new_ibl[:,:,i] = np.squeeze(ibls[i]) 
         
-        # shuffle channel
-        new_ibl = np.transpose(new_ibl,(2,0,1))
-        np.random.shuffle(new_ibl)
-        new_ibl = np.transpose(new_ibl, (1,2,0))
+#         # shuffle channel
+#         new_ibl = np.transpose(new_ibl,(2,0,1))
+#         np.random.shuffle(new_ibl)
+#         new_ibl = np.transpose(new_ibl, (1,2,0))
         
+        new_ibl = ibls[0]        
         new_shadow = shadows[0]
         for i in range(1, len(shadows)):
+            new_ibl += ibls[i]
             new_shadow += shadows[i]
-        
+            
         return new_ibl, new_shadow
     
     def get_min_max(self, batch_data, name):

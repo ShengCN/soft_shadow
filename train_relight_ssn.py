@@ -9,6 +9,7 @@ from tqdm import tqdm
 import numpy as np
 import os
 import math
+import datetime
 
 from ssn.ssn_dataset import SSN_Dataset
 # from ssn.ssn_submodule import Contract
@@ -139,7 +140,7 @@ def training_iteration(model, train_dataloder, optimizer, train_loss, epoch_num)
                     torchvision.utils.save_image(predicted_img[0:random_batch, 0, :, :].view(random_batch, 1,h, w), "{}_shadow.png".format(exp_name), nrow=4)
                     visdom_show_batch(mask[:random_batch,:,:,:], win_name="train masks", exp=exp)
                     visdom_show_batch(vis_shadow_img, win_name="train shadow gt vs. inference", exp=exp)
-                    visdom_show_batch(L_t[:random_batch,:,:,:], win_name='light', exp=exp, normalize=False)
+                    visdom_show_batch(L_t[:random_batch,:,:,:], win_name='light', exp=exp, normalize=True)
                     
                 # keep tracking
                 train_loss.append(loss.item()/np.sqrt(params.batch_size))
@@ -222,10 +223,7 @@ def train(params):
     hist_train_loss = []
     hist_valid_loss = []
 
-    # transforms
-    # train_trnfs, valid_trnfs = data_augmentation()
-
-    # data set
+    # dataset
     ds_csv = "~/Dataset/soft_shadow/train/metadata.csv"
     train_set = SSN_Dataset(ds_csv, True)
     train_dataloder = DataLoader(train_set, batch_size=params.batch_size, shuffle=True, num_workers=params.workers, drop_last=True)
@@ -235,7 +233,10 @@ def train(params):
     # model & optimizer & scheduler & loss function
     model = Relight_SSN(1, 1)    # input is mask + human
     model.to(device)
-    optimizer = optim.Adam(model.parameters(), lr=params.lr, betas=(params.beta1, 0.999), eps=1e-5)
+    optimizer = optim.Adam(model.parameters(), 
+                           lr=params.lr, 
+                           betas=(params.beta1, 0.999), 
+                           eps=1e-5)
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=params.patience)
     
 #     import pdb;pdb.set_trace()
@@ -293,10 +294,7 @@ def train(params):
         log_info += "Epoch: {} training loss: {}, valid loss: {}  <br>".format(epoch, cur_train_loss, cur_valid_loss)
         # save results
         if best_valid_loss > cur_valid_loss:
-            import datetime
-
             log_info += "<br> ---------- Exp: {} Find better loss: {} at {} --------  <br>".format(exp_name, cur_valid_loss, datetime.datetime.now())
-
             visdom_log(log_info, exp=exp)
 
             best_valid_loss = cur_valid_loss

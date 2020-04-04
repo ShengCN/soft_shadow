@@ -41,7 +41,7 @@ class Conv(nn.Module):
             
         norm_layer, activation_func = get_layer_info(out_channels, activation_func)
         self.conv = nn.Sequential(
-            nn.Conv2d(in_channels, out_channels,stride=conv_stride, kernel_size=3, padding=1),
+            nn.Conv2d(in_channels, out_channels,stride=conv_stride, kernel_size=3, padding=1, bias=True),
             norm_layer,
             activation_func)
         
@@ -98,7 +98,8 @@ class Up_Stream(nn.Module):
 
         self.ibl_num = parameter.ibl_num
         
-        input_channel = 512 * self.ibl_num
+        # input_channel = 512 * self.ibl_num
+        input_channel = 512
         self.up_16_16_1 = Conv(input_channel, 256, 1, activation_func)
         self.up_16_16_2 = Conv(768, 512, 1, activation_func)
         self.up_16_16_3 = Conv(1024, 512, 1, activation_func)
@@ -113,7 +114,7 @@ class Up_Stream(nn.Module):
         self.up_128_128_1 = Conv(128, 64, 1, activation_func)
 
         self.up_128_256 = Up(128, 32, activation_func)
-        self.out_conv = Conv(64, out_channels, 1, activation_func='prelu')
+        self.out_conv = Conv(64, out_channels, 1, activation_func='relu')
         
         # import pdb; pdb.set_trace()
         
@@ -122,8 +123,8 @@ class Up_Stream(nn.Module):
         
         # import pdb; pdb.set_trace()
         # multiple channel ibl
-        tiled_l = l.view(-1, 512 * self.ibl_num, 1, 1).repeat(1, 1, 16, 16)
-        
+        # tiled_l = l.view(-1, 512 * self.ibl_num, 1, 1).repeat(1, 1, 16, 16)
+        tiled_l = l.view(-1, 512, 1, 1).repeat(1, 1, 16, 16)
         
         # print("tiled_l: {}".format(tiled_l.size()))
 

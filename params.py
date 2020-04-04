@@ -5,7 +5,7 @@ class params():
     
     class __params():
         def __init__(self):
-            self.norm = 'group_norm'
+            self.norm = 'batch_norm'
             self.activation = 'prelu'
             self.bilinear = True
             self.prelu = True
@@ -53,10 +53,10 @@ def parse_params():
     parser.add_argument('--exp_name', type=str, default='l1 loss',help='experiment name')
     parser.add_argument('--new_exp', action='store_true', help='experiment 2')
     parser.add_argument('--bilinear', action='store_true', help='use bilinear in up-stream')
-    parser.add_argument('--norm', type=str, default='group_norm', help='use group norm')
+    parser.add_argument('--norm', type=str, default='batch_norm', help='use group norm')
     parser.add_argument('--prelu', action='store_true', help='use group norm')
     parser.add_argument('--double_conv', action='store_true', help='use group norm')
-    parser.add_argument('--ibl_num', type=int, default=2, help='maximum ibl number during training')
+    parser.add_argument('--ibl_num', type=int, default=3, help='maximum ibl number during training')
     
     # parser.add_argument('--cpu', action='store_true', help='Force training on CPU')
     arguments = parser.parse_args()
