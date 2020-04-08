@@ -38,7 +38,8 @@ class Conv(nn.Module):
         parameter = params().get_params()
         if parameter.prelu:
             activation_func = 'prelu'
-            
+        else:
+            activation_func = 'relu'
         norm_layer, activation_func = get_layer_info(out_channels, activation_func)
         self.conv = nn.Sequential(
             nn.Conv2d(in_channels, out_channels,stride=conv_stride, kernel_size=3, padding=1, bias=True),
@@ -57,6 +58,8 @@ class Up(nn.Module):
         parameter = params().get_params()
         if parameter.prelu:
             activation_func = 'prelu'
+        else:
+            activation_func = 'relu'
         norm_layer, activation_func = get_layer_info(out_channels, activation_func)
         
         if not parameter.bilinear:

@@ -29,8 +29,8 @@ from animation import *
 params = options().get_params()
 print(params)
 
-# device = torch.device("cpu")
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+device = torch.device("cpu")
+# device = torch.device("cuda:2" if torch.cuda.is_available() else "cpu")
 print("Device: ", device)
 model = Relight_SSN(1,1)
 weight_file = os.path.join('weights', 'l1 loss_04-April-12-06-AM.pt')
@@ -129,7 +129,7 @@ def merge_result(pixel_img, mask_img, shadow_result):
 def flipping_shadow(shadow_img, ibl_num):
     return ibl_num - shadow_img
 
-def render_animation(target_img, target_mask_np, output_folder, ibl_animator):
+def render_animation(target_img, target_mask_np, output_folder, ibl_animator, prefix_name=''):
     """ Given a mask(w x h x 3, uint8), render a sequence of images for making an animation"""
     
     def rotate_ibl(img_np, axis=1, step=1):
@@ -197,7 +197,8 @@ def render_animation(target_img, target_mask_np, output_folder, ibl_animator):
                 predicted_img[i] = flipping_shadow(predicted_img[i], ibl_num)
             
             return predicted_img
-            
+    
+    
     ibl_num = ibl_animator.get_ibl_num()
     batch_size, batch_counter = 40, 0
     predict_fname_list = []
@@ -210,18 +211,22 @@ def render_animation(target_img, target_mask_np, output_folder, ibl_animator):
     batch_mask_img = np.array([target_mask_np,] * batch_size)
                 
     i_begin, i_end, i_step = 0, 512, 5
-    j_begin, j_end, j_step = 150, 190, 2
+    j_begin, j_end, j_step = 150, 190, 10
     j_range = (j_end - j_begin) // j_step
     i_range = (i_end - i_begin) // i_step
     
-    total = i_range * j_range // 10
+    total = i_range * j_range
     for i in tqdm(range(total)):
+        batch_counter += 1
+        prefix += 1
+        
         ibl = ibl_animator.animate_ibl(i, total)
         batch_ibl[batch_counter-1,:,:,:] = ibl
         
-        out_fname = '{:07d}.png'.format(prefix)
+        out_fname = '{}_{:07d}.png'.format(prefix_name, prefix-1)
         predict_fname = os.path.join(output_folder, out_fname)
         predict_fname_list.append(predict_fname)
+        
         if batch_counter == batch_size:
             
             # batch predict results
@@ -235,9 +240,6 @@ def render_animation(target_img, target_mask_np, output_folder, ibl_animator):
                 merge_save(target_img, target_mask_np, batch_ibl[bi], predict_result, predict_fname_list[bi])
             batch_counter = 0
             predict_fname_list = []
-        
-        batch_counter += 1
-        prefix += 1
                     
 if __name__ == '__main__':
     pass

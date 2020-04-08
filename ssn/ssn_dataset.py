@@ -11,8 +11,8 @@ import pandas as pd
 from PIL import Image
 import time
 import random
-from scipy.ndimage.filters import gaussian_filter
 from skimage.transform import resize
+
 from params import params
 
 class To_Normalized_Img(object):
@@ -41,14 +41,8 @@ class IBL_Transform(object):
     def __call__(self, img):
         normalize_transform = To_Normalized_Img()
         img = normalize_transform(img)
-        img = (img[:,:,0] + img[:,:,1] + img[:,:,2])/3.0
-        # print('1 min: {} max: {} shape: {}'.format(np.min(img),np.max(img), img.shape))
-        img = gaussian_filter(img, sigma=20)
-        # print('2 min: {} max: {} shape: {}'.format(np.min(img),np.max(img), img.shape))
-        img = resize(img,(16,32))
-        img = img/np.max(img)
-        # print('3 min: {} max: {} shape: {}'.format(np.min(img),np.max(img), img.shape))
-        return img.reshape(16,32,1)
+        
+        return img[:,:,1:2]
 
 class Mask_Transform(object):
     """ Mask transforms before training
@@ -58,13 +52,9 @@ class Mask_Transform(object):
     def __call__(self, img):
         normalize_transform = To_Normalized_Img()
         img = normalize_transform(img)
-        h, w, c = img.shape
-        img = (img[:, :, 0] + img[:, :, 1] + img[:, :, 2])/3.0
-        img = resize(img, (256, 256, 1))
-        ret = np.zeros(img.shape, dtype=np.float)
-        ret[np.where(img > 0.9)] = 1.0
-        return ret
-
+        h,w,c = img.shape
+        return img[:,:,0:1]
+    
 class SSN_Dataset(Dataset):
     def __init__(self, csv_meta_file, is_training):
         start = time.time()
@@ -88,6 +78,7 @@ class SSN_Dataset(Dataset):
         
         parameter = params().get_params()
         self.ibl_num = parameter.ibl_num
+        self.scale_ibl = parameter.scale_ibl
 
     def __len__(self):
         if self.is_training:
@@ -103,12 +94,10 @@ class SSN_Dataset(Dataset):
         if self.is_training and idx > self.training_num:
             print("error")
         
-        random_range = (0, self.__len__())
         # offset to validation set
         if not self.is_training:
             idx = self.training_num + idx
-            random_range = (self.training_num , self.training_num + self.__len__())
-            
+        
         def get_data(metadata_row):
             mask_path, light_path, shadow_path = metadata_row[1], metadata_row[3], metadata_row[2]
             # convert image to [0.0, 1.0] numpy 
@@ -122,8 +111,9 @@ class SSN_Dataset(Dataset):
         shadow_list, light_list = [shadow_img], [light_img]
         
         # random ibls
-        seed = idx * 1234 + os.getpid()
+        seed = idx * 1234 + os.getpid() + time.time()
         random.seed(seed)
+        
         # random_ibl_num = random.randint(0,2)
         
         random_ibl_num = random.randint(0,self.ibl_num-1)
@@ -142,7 +132,6 @@ class SSN_Dataset(Dataset):
         # self.get_min_max(shadow_img,'shadow')
         
         mask_img, shadow_img, light_img = self.to_tensor(mask_img), self.to_tensor(shadow_img),self.to_tensor(light_img)
-        
         
         return mask_img, light_img, shadow_img
     
@@ -204,12 +193,18 @@ class SSN_Dataset(Dataset):
 #         np.random.shuffle(new_ibl)
 #         new_ibl = np.transpose(new_ibl, (1,2,0))
         
-        new_ibl = ibls[0]        
-        new_shadow = shadows[0]
-        for i in range(1, len(shadows)):
-            new_ibl += ibls[i]
-            new_shadow += shadows[i]
+        scale_factor = 1.0
+        if self.scale_ibl:
+            scale_factor = random.random()
             
+        new_ibl = ibls[0] * scale_factor        
+        new_shadow = shadows[0] * scale_factor
+
+        for i in range(1, len(shadows)):
+            if self.scale_ibl: 
+                scale_factor = random.random()
+            new_ibl += ibls[i] * scale_factor
+            new_shadow += shadows[i] * scale_factor
         return new_ibl, new_shadow
     
     def get_min_max(self, batch_data, name):

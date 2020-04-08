@@ -29,70 +29,29 @@ if params.new_exp:
 else:
     exp = 0
 exp_name = params.exp_name
+
+""" https://discuss.pytorch.org/t/changing-the-weight-decay-on-bias-using-named-parameters/19132/3
+"""
+def set_model_optimizer(model, weight_decay):
+    optim_params = []
+    for key, value in model.named_parameters(): 
+        if not value.requires_grad: continue # frozen weights		
+            
+        if key[-4:] == 'bias':
+            optim_params += [{'params': value,'weight_decay':0.0}]
+        else:
+            optim_params += [{'params': value,'weight_decay':weight_decay}]
     
-def data_augmentation():
-    """ Transforms passed to training and validating """
-    train_trnfs = transforms.Compose([
-        transforms.ToTensor()
-    ])
-
-    valid_trnfs = transforms.Compose([
-        transforms.ToTensor()
-    ])
-
-    return train_trnfs, valid_trnfs
-
-
-def get_spherical_weight():
-    filename = "spherical_weight.pt"
-    if os.path.exists(filename):
-        weight = torch.load(filename)
-    else:
-        weight = torch.zeros(16, 32)
-        # todo, vectorize this process
-        for h in range(weight.size()[0]):
-            weight[h, :] = abs(math.sin(h / 16.0 * 3.1415926)) + 0.001
-        torch.save(weight, filename)
-
-    return weight
-
-def spherical_loss(gt_img, pred_img):
-    """ latitude-longtitude loss """
-    weight = get_spherical_weight()
-    weight = weight.to(device)
-    gt_img = torch.log(1.0 + gt_img)
-    pred_img = torch.log(1.0 + pred_img)
-    pred_img = pred_img.view(-1, 1, 16, 32)
-    diff = torch.norm(weight * (gt_img - pred_img), 2)
-
-    return diff * diff
-
+    # import pdb; pdb.set_trace()
+    optimizer = optim.Adam(optim_params, 
+                           lr=params.lr, 
+                           betas=(params.beta1, 0.999), 
+                           eps=1e-5)
+    return optimizer
+    
 def reconstruct_loss(gt_img, pred_img):
     """ M * (I-I') """
     return torch.norm(gt_img-pred_img, 2)
-
-def loss_functions(ty, sl, sy, gt_ty, gt_sl, gt_sy):
-    """ Loss Function:
-          a. bottle-neck output light 
-          b. reconstruct output original shadow
-          c. reconstruct output new shadowsche
-    """
-    bn_light_loss = spherical_loss(gt_sl, sl)  # light loss
-    # gt_sy_mask, gt_sy_shadow = decouple_image(gt_sy)
-    # sy_mask, sy_shadow = decouple_image(sy)
-    # gt_ty_mask, gt_ty_shadow = decouple_image(gt_ty)
-    # ty_mask, ty_shadow = decouple_image(ty)
-
-    # recon_ori_mask_loss = reconstruct_loss(gt_sy_mask, sy_mask)  # self supervision loss
-    # recon_ori_shadow_loss = reconstruct_loss(gt_sy_shadow, sy_shadow)  # self supervision loss
-
-    # recon_nov_mask_loss = reconstruct_loss(gt_ty_mask, ty_mask)  # new view loss
-    # recon_nov_shadow_loss = reconstruct_loss(gt_ty_shadow, ty_shadow)  # self supervision loss
-
-    recon_ori_loss = reconstruct_loss(gt_ty, ty)
-    recon_nov_loss = reconstruct_loss(gt_sy, sy)
-    # return bn_light_loss, recon_ori_mask_loss + recon_ori_shadow_loss, recon_nov_mask_loss + recon_nov_shadow_loss
-    return bn_light_loss, recon_nov_loss, recon_ori_loss
 
 def training_iteration(model, train_dataloder, optimizer, train_loss, epoch_num):
     # training
@@ -232,11 +191,8 @@ def train(params):
 
     # model & optimizer & scheduler & loss function
     model = Relight_SSN(1, 1)    # input is mask + human
-    model.to(device)
-    optimizer = optim.Adam(model.parameters(), 
-                           lr=params.lr, 
-                           betas=(params.beta1, 0.999), 
-                           eps=1e-5)
+    model.to(device)    
+    optimizer = set_model_optimizer(model, params.weight_decay)
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=params.patience)
     
 #     import pdb;pdb.set_trace()

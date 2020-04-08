@@ -15,6 +15,8 @@ class Relight_SSN(nn.Module):
         parameter = params().get_params()
         if parameter.prelu:
             activation_func = 'prelu'
+        else:
+            activation_func = 'relu'
             
         norm_layer, activation_func = get_layer_info(32 - n_channels, activation_func)
 
