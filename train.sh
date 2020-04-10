@@ -1,1 +1,1 @@
-CUDA_VISIBLE_DEVICES=0,1,2 python train_relight_ssn.py --multi_gpu --batch_size=72 --workers=48 --norm='batch_norm' --use_schedule --bilinear --ibl_num=12 --resume --weight_file='l1 loss_07-April-09-17-PM.pt' --lr=1e-3 --relearn
+CUDA_VISIBLE_DEVICES=0,1,2 python train_relight_ssn.py --multi_gpu --batch_size=76 --workers=48 --norm='batch_norm' --use_schedule --bilinear --ibl_num=24 --resume --weight_file='l1 loss_09-April-12-54-AM.pt' --lr=1e-4 --relearn

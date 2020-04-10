@@ -28,9 +28,11 @@ def render_worker(path_relative_vec):
     relative_vector_str = path_relative_vec[1]
     
     relative_vec = get_vector(relative_vector_str)
+    
     folder = os.path.dirname(mask_path)
     prefix = os.path.basename(mask_path)[:os.path.basename(mask_path).find("_")]
     light_path = os.path.join(folder,"{}_light.png".format(prefix))
+    
     img = render_shadow(relative_vec)
     
     img = img/255.0
@@ -63,9 +65,14 @@ def parallel_render():
             print("Finished: {} \r".format(float(i)/task_num), flush=True, end='')
 
 def resize_worker(path):
-    img = Image.open(path)
-    img.resize((256,256))
-    img.save(path)
+    mask, shadow = path
+    img = Image.open(shadow)
+    img = img.resize((256,256))
+    img.save(shadow)
+    
+    img = Image.open(mask)
+    img = img.resize((256,256))
+    img.save(mask)    
             
 def parallel_resize():
     dataset_folder = '/home/ysheng/Dataset/soft_shadow/train'
@@ -73,17 +80,21 @@ def parallel_resize():
     with open(out_file) as f:
         csv_read = csv.reader(f, delimiter=',')
         mask_path_list = []
+        shadow_path_list = []
         for r in csv_read:
             mask_path_list.append(r[1])
+            shadow_path_list.append(r[2])
 
     task_num = len(mask_path_list) 
     print(task_num)    
-    processor_num = 48
+    processor_num = 512
+    
+    input_list = zip(mask_path_list, shadow_path_list)
     with multiprocessing.Pool(processor_num) as pool:
         # working_fn = partial(batch_working_process, src_folder, out_folder)
-        for i, _ in enumerate(pool.imap_unordered(resize_worker, mask_path_list), 1):
+        for i, _ in enumerate(pool.imap_unordered(resize_worker, input_list), 1):
             print("Finished: {} \r".format(float(i)/task_num), flush=True, end='')
             
 if __name__ == '__main__':
-    # parallel_render()
-    parallel_resize()
+    parallel_render()
+    # parallel_resize()
