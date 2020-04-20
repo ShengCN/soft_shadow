@@ -47,6 +47,7 @@ def set_model_optimizer(model, weight_decay):
                            lr=params.lr, 
                            betas=(params.beta1, 0.999), 
                            eps=1e-5)
+    # optimizer = optim.SGD(optim_params, lr=params.lr,  momentum=0.9)
     return optimizer
     
 def reconstruct_loss(gt_img, pred_img):
@@ -63,13 +64,7 @@ def training_iteration(model, train_dataloder, optimizer, train_loss, epoch_num)
 
         vis_predicted_img = torch.zeros(1)
         for j in range(params.timers):
-            for i, (mask, light, shadow) in enumerate(train_dataloder):
-        
-                # concatenate human mask and shadow mask
-                # I_s = torch.cat((mask, shadow), dim=1).to(device)
-                # I_t = torch.cat((nov_mask, nov_shadow), dim=1).to(device)
-                # import pdb; pdb.set_trace()
-                
+            for i, (mask, light, shadow, ibl_num) in enumerate(train_dataloder):
                 I_s, L_t, I_t = mask.to(device), light.to(device), shadow.to(device)
 
                 optimizer.zero_grad()
@@ -96,19 +91,15 @@ def training_iteration(model, train_dataloder, optimizer, train_loss, epoch_num)
                     vis_shadow_img = torch.cat((vis_predicted_img_gt[0:random_batch, :, :, :].view(random_batch, 1, h, w), 
                                                 vis_predicted_img[0:random_batch, :, :, :].view(random_batch,1,h, w)))
 
-                    torchvision.utils.save_image(predicted_img[0:random_batch, 0, :, :].view(random_batch, 1,h, w), "{}_shadow.png".format(exp_name), nrow=4)
+                    # torchvision.utils.save_image(predicted_img[0:random_batch, 0, :, :].view(random_batch, 1,h, w), "{}_shadow.png".format(exp_name), nrow=4)
                     visdom_show_batch(mask[:random_batch,:,:,:], win_name="train masks", exp=exp)
                     visdom_show_batch(vis_shadow_img, win_name="train shadow gt vs. inference", exp=exp)
-                    visdom_show_batch(L_t[:random_batch,:,:,:], win_name='light', exp=exp, normalize=True)
+                    
+                    if not params.new_ibl:
+                        visdom_show_batch(L_t[:random_batch,:,:,:], win_name='light', exp=exp, normalize=True)
                     
                 # keep tracking
                 train_loss.append(loss.item()/np.sqrt(params.batch_size))
-                
-#                 for i in range(batch_size):
-#                     print('batch {}, loss: {}'.format(i, reconstruct_loss(I_t[i:i+1,:,:,:], predicted_img[i:i+1,:,:,:])))
-
-#                 import pdb; pdb.set_trace()
-                    
                 visdom_plot_loss("train_total_loss", train_loss, exp)
 
                 t.update()
@@ -127,14 +118,7 @@ def validation_iteration(model, valid_dataloader, valid_loss, epoch_num):
             vis_predicted_img = torch.zeros(1)
 
             for j in range(params.timers):
-                for i, (mask, light, shadow) in enumerate(valid_dataloader):
-
-                    # concatenate human mask and shadow mask
-#                     I_s = torch.cat((mask, shadow), dim=1).to(device)
-#                     L_t = nov_light.to(device)
-#                     I_t = torch.cat((nov_mask, nov_shadow), dim=1).to(device)
-#                     L_s = light.to(device)
-
+                for i, (mask, light, shadow, ibl_num) in enumerate(valid_dataloader):
                     I_s = mask.to(device)
                     L_t = light.to(device)
                     I_t = shadow.to(device)
@@ -154,14 +138,11 @@ def validation_iteration(model, valid_dataloader, valid_loss, epoch_num):
 
                         batch_size, c, h, w = vis_predicted_img.size()
                         random_batch = min(4, batch_size)
-                        vis_shadow_img = torch.cat((vis_predicted_img_gt[0:random_batch, :, :, :].view(random_batch, 1,
-                                                                                                       h, w),
-                                                    vis_predicted_img[0:random_batch, :, :, :].view(random_batch, 1, h,
-                                                                                                    w)))
-                        torchvision.utils.save_image(predicted_img[0:random_batch, :, :, :].view(random_batch, 1, h, w),
-                                                     "valid_{}_shadow.png".format(exp_name), nrow=4,
-                                                     normalize=True)
-                        
+                        vis_shadow_img = torch.cat((vis_predicted_img_gt[0:random_batch, :, :, :].view(random_batch, 1, h, w),
+                                                    vis_predicted_img[0:random_batch, :, :, :].view(random_batch, 1, h, w)))
+#                         torchvision.utils.save_image(predicted_img[0:random_batch, :, :, :].view(random_batch, 1, h, w),
+#                                                      "valid_{}_shadow.png".format(exp_name), nrow=4,
+#                                                      normalize=True)
                         visdom_show_batch(mask[:random_batch,:,:,:], win_name="valid masks", exp=exp)
                         visdom_show_batch(vis_shadow_img, win_name="valid shadow gt vs. inference", exp=exp)
                         
@@ -254,7 +235,8 @@ def train(params):
             visdom_log(log_info, exp=exp)
 
             best_valid_loss = cur_valid_loss
-            save_model("weights", model, optimizer, epoch, best_valid_loss, exp_name, hist_train_loss, hist_valid_loss, params.multi_gpu)
+            global_params = options().get_params()
+            save_model("weights", model, optimizer, epoch, best_valid_loss, exp_name, hist_train_loss, hist_valid_loss, global_params)
 
 
     print("Training finished")

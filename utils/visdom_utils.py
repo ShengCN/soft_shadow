@@ -56,7 +56,6 @@ def visdom_show_batch(imgs, win_name=None, exp=0, nrow=4, normalize=True):
     if normalize:
         imgs = normalize_img(imgs)
     
-    
     if win_name is None:
         cur_viz.images(imgs, win="batch visualize",nrow=nrow)
     else:

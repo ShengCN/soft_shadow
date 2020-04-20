@@ -21,7 +21,7 @@ def parse(file_path):
             # print("{} {}".format(i, line))
             line_list.append(line)
     
-    seg_num = 5
+    seg_num = 6
     data_num = int(len(line_list)/seg_num)
     # print("There are: {} data".format(data_num))
     gt_dict = {}
@@ -29,14 +29,17 @@ def parse(file_path):
     # slice the gt data file for each data
     for i in range(data_num):
         prefix = line_list[seg_num * i + 0]
-        camera_pos_key, camera_pos_value = line_list[seg_num * i + 1].split()[0], line_list[seg_num * i + 1].split()[1:]
-        human_rot_key,human_rot_value = line_list[seg_num * i + 2].split()[0], line_list[seg_num * i + 2].split()[1:]
-        human_pos_key, human_pos_value = line_list[seg_num * i + 3].split()[0], line_list[seg_num * i + 3].split()[1:]
+        group_num = line_list[seg_num * i + 1][-2]
         
-        light_pos_key = line_list[seg_num * i + 4].split()[0]
-        light_pos_value = line_list[seg_num * i + 4].split()[1:]
+        camera_pos_key, camera_pos_value = line_list[seg_num * i + 2].split()[0], line_list[seg_num * i + 2].split()[1:]
+        human_rot_key,human_rot_value = line_list[seg_num * i + 3].split()[0], line_list[seg_num * i + 3].split()[1:]
+        human_pos_key, human_pos_value = line_list[seg_num * i + 4].split()[0], line_list[seg_num * i + 4].split()[1:]
+        
+        light_info = line_list[seg_num * i + 5].split()
+        light_pos_key, light_pos_value = light_info[0], light_info[1:]
         
         gt_dict[prefix] = {
+            'group_num':group_num,
             camera_pos_key:camera_pos_value,
             human_rot_key:human_rot_value, 
             human_pos_key:human_pos_value, 
@@ -60,6 +63,7 @@ def parse_folder(folder, out_file):
             mask_file = os.path.join(cur_folder, prefix.split()[0] + "_mask.png")
             shadow_file = os.path.join(cur_folder, prefix.split()[0] + "_shadow.png")
             light_file = os.path.join(cur_folder, prefix.split()[0] + "_light.png")
+            light_np_file = os.path.join(cur_folder, prefix.split()[0] + "_light.npy")
             
             human_pos,light_pos = value['human_position'],value['light_position']
             human_pos = np.array([float(human_pos[0]), float(human_pos[1]), float(human_pos[2])])
@@ -68,9 +72,16 @@ def parse_folder(folder, out_file):
             relative_pos_str = '{}_{}_{}'.format(relative_pos[0], relative_pos[1], relative_pos[2])
             camera_pos = '{}_{}_{}'.format(value['camera_position'][0], value['camera_position'][1], value['camera_position'][2])
             human_rot = value['human_rotation_alpha']
-            lines += '{},{},{},{},{},{},{}\n'.format(cur_folder, mask_file, shadow_file, light_file,camera_pos, human_rot,relative_pos_str)
-#             light_pos = '{}_{}_{}'.format(value['light_position'][0], value['light_position'][1], value['light_position'][2])
-#             lines += "{},{},{},{},{},{}\n".format(mask_file, shadow_file, light_file, camera_pos, value['human_rotation_alpha'][0], light_pos)
+            group_num = value['group_num']
+            lines += '{},{},{},{},{},{},{},{},{}\n'.format(cur_folder, 
+                                                           mask_file, 
+                                                           shadow_file, 
+                                                           light_file,
+                                                           camera_pos, 
+                                                           human_rot,
+                                                           relative_pos_str, 
+                                                           light_np_file, 
+                                                           group_num)
     
     with open(out_file, "w+") as f:
         f.write(lines)

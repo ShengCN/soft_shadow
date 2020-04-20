@@ -1,1 +1,1 @@
-CUDA_VISIBLE_DEVICES=0,1,2 python train_relight_ssn.py --multi_gpu --batch_size=72 --workers=48 --norm='batch_norm' --use_schedule --bilinear --ibl_num=24 --lr=1e-3 --scale_ibl
+CUDA_VISIBLE_DEVICES=0,1,2 python train_relight_ssn.py --exp_name='new_dataset' --scale_ibl --multi_gpu --batch_size=78 --workers=48 --norm='batch_norm' --use_schedule --patience=10 --bilinear --lr=5e-4 

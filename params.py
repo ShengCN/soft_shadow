@@ -6,13 +6,16 @@ class params():
     class __params():
         def __init__(self):
             self.norm = 'batch_norm'
-            self.activation = 'prelu'
+            self.activation = 'relu'
             self.bilinear = True
-            self.prelu = True
+            self.prelu = False
             self.double_conv = False
             self.ibl_num = 3
             self.weight_decay = 5e-4
-            self.scale_ibl = True
+            self.scale_ibl = False
+            self.small_ds = False
+            self.new_ibl = False
+            self.multi_gpu = False
             
         def set_params(self, options):
             self.options = options
@@ -23,10 +26,20 @@ class params():
             self.ibl_num = options.ibl_num
             self.weight_decay = options.weight_decay
             self.scale_ibl = options.scale_ibl
+            self.small_ds = options.small_ds
+            self.new_ibl = options.new_ibl
+            self.multi_gpu = options.multi_gpu
             
         def __str__(self):
-            return 'norm: {} bilinear: {} activation: {}'.format(self.norm, self.bilinear, self.activation)
-        
+            return 'norm: {} bilinear: {} activation: {} prelu: {} ibl: {} weight decay: {} scale_ibl: {} small ds: {}'.format(self.norm, 
+                                                                                                                               self.bilinear, 
+                                                                                                                               self.activation,
+                                                                                                                               self.prelu,
+                                                                                                                               self.ibl_num,
+                                                                                                                               self.weight_decay,
+                                                                                                                               self.scale_ibl,
+                                                                                                                               self.small_ds)
+
     # private static variable
     param_instance = None
     
@@ -61,7 +74,10 @@ def parse_params():
     parser.add_argument('--norm', type=str, default='batch_norm', help='use group norm')
     parser.add_argument('--prelu', action='store_true', help='use group norm')
     parser.add_argument('--double_conv', action='store_true', help='use group norm')
-    parser.add_argument('--ibl_num', type=int, default=3, help='maximum ibl number during training')
+    parser.add_argument('--small_ds', action='store_true', help='small dataset')
+    parser.add_argument('--new_ibl', action='store_true', help='use new ibl represetation') 
+    
+    parser.add_argument('--ibl_num', type=int, default=24, help='maximum ibl number during training')
     parser.add_argument('--weight_decay', type=float, default=4e-5, help='weight decay for model weight')
     
     # parser.add_argument('--cpu', action='store_true', help='Force training on CPU')

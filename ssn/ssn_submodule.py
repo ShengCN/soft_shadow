@@ -100,9 +100,14 @@ class Up_Stream(nn.Module):
             activation_func='relu'
 
         self.ibl_num = parameter.ibl_num
+        self.new_ibl = parameter.new_ibl
         
         # input_channel = 512 * self.ibl_num
-        input_channel = 512
+        if not self.new_ibl:
+            input_channel = 512
+        else:
+            input_channel = 512 * 3
+            
         self.up_16_16_1 = Conv(input_channel, 256, 1, activation_func)
         self.up_16_16_2 = Conv(768, 512, 1, activation_func)
         self.up_16_16_3 = Conv(1024, 512, 1, activation_func)
@@ -122,12 +127,15 @@ class Up_Stream(nn.Module):
         # import pdb; pdb.set_trace()
         
     def forward(self, l, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11):
-        batch_size, c, h, w = l.size()
+        # batch_size, c, h, w = l.size()
         
         # import pdb; pdb.set_trace()
         # multiple channel ibl
         # tiled_l = l.view(-1, 512 * self.ibl_num, 1, 1).repeat(1, 1, 16, 16)
-        tiled_l = l.view(-1, 512, 1, 1).repeat(1, 1, 16, 16)
+        if not self.new_ibl:
+            tiled_l = l.view(-1, 512, 1, 1).repeat(1, 1, 16, 16)
+        else:
+            tiled_l = l.view(-1, 512 * 3, 1, 1).repeat(1, 1, 16, 16)
         
         # print("tiled_l: {}".format(tiled_l.size()))
 
@@ -178,6 +186,7 @@ class Up_Stream(nn.Module):
         y = torch.cat((x2, y), dim=1)
         y = self.up_128_256(y)          # 32 x 256 x 256
         # print(y.size())
+        
         y = torch.cat((x1, y), dim=1)
         y = self.out_conv(y)          # 3 x 256 x 256
         

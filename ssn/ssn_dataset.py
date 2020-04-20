@@ -12,7 +12,7 @@ from PIL import Image
 import time
 import random
 from skimage.transform import resize
-
+import matplotlib.pyplot as plt
 from params import params
 
 class To_Normalized_Img(object):
@@ -27,12 +27,13 @@ class To_Normalized_Img(object):
 class ToTensor(object):
     """Convert ndarrays in sample to Tensors."""
 
-    def __call__(self, img):
+    def __call__(self, img, is_transpose=True):
         # swap color axis because
         # numpy image: H x W x C
         # torch image: C X H X W
-        image = img.transpose((2, 0, 1))
-        return torch.Tensor(image)
+        if is_transpose:
+            img = img.transpose((2, 0, 1))
+        return torch.Tensor(img)
 
 class IBL_Transform(object):
     """ IBL transforms before training"""
@@ -58,7 +59,15 @@ class Mask_Transform(object):
 class SSN_Dataset(Dataset):
     def __init__(self, csv_meta_file, is_training):
         start = time.time()
-
+        
+        # random group ids
+        self.ibl_group_id_list = [i for i in range(8)]
+        
+        # # of samples in each group
+        # magic number here
+        self.ibl_group_size = 16
+        
+        parameter = params().get_params()
         self.meta_data = pd.read_csv(csv_meta_file, header=None).to_numpy()
 
         self.is_training = is_training
@@ -76,9 +85,14 @@ class SSN_Dataset(Dataset):
         
         self.training_num = (len(self.meta_data) - int(len(self.meta_data) / 10))
         
-        parameter = params().get_params()
+        if parameter.small_ds:
+            self.training_num = self.training_num//30
+        
+        
         self.ibl_num = parameter.ibl_num
         self.scale_ibl = parameter.scale_ibl
+        self.ibl_shape = [16, 32, 1]
+        self.shadow_shape = [256, 256, 1]
 
     def __len__(self):
         if self.is_training:
@@ -93,47 +107,36 @@ class SSN_Dataset(Dataset):
     def __getitem__(self, idx):
         if self.is_training and idx > self.training_num:
             print("error")
-        
         # offset to validation set
         if not self.is_training:
             idx = self.training_num + idx
-        
-        def get_data(metadata_row):
-            mask_path, light_path, shadow_path = metadata_row[1], metadata_row[3], metadata_row[2]
-            # convert image to [0.0, 1.0] numpy 
-            mask_img = self.mask_transfrom(Image.open(mask_path))
-            light_img = self.ibl_transform(Image.open(light_path))
-            shadow_img = self.mask_transfrom(Image.open(shadow_path))
-            return mask_img, light_img, 1.0-shadow_img
-        
-        path_list = self.meta_data[idx]
-        mask_img, light_img, shadow_img = get_data(path_list)
-        shadow_list, light_list = [shadow_img], [light_img]
         
         # random ibls
         seed = idx * 1234 + os.getpid() + time.time()
         random.seed(seed)
         
-        # random_ibl_num = random.randint(0,2)
+        # random_ibl_num = random.randint(1,self.ibl_num)
         
-        random_ibl_num = random.randint(0,self.ibl_num-1)
-        key = (os.path.basename(self.meta_data[idx][0]), self.meta_data[idx][-3],self.meta_data[idx][-2])
-        random_lists = random.choices(self.mappings[key],k=random_ibl_num)
+        key = self.get_key(self.meta_data[idx])
+        # random_lists = random.choices(self.mappings[key],k=random_ibl_num)
+        group_lists = random.sample(self.ibl_group_id_list, k=3)
+        random_lists = []
+        for g in group_lists:
+            sample_group = min(len(self.mappings[key][g]), self.ibl_group_size)
+            random_lists += random.sample(self.mappings[key][g], k=sample_group)
         
-        for new_data in random_lists:
-            _,light,shadow = get_data(new_data)
-            shadow_list.append(shadow)
-            light_list.append(light)
-
-        light_img, shadow_img = self.render_new_shadow(light_list, shadow_list)
+        random_ibl_num = len(random_lists)
+        shadows, lights = np.zeros(([random_ibl_num] + self.shadow_shape)), np.zeros(([random_ibl_num] + self.ibl_shape))
+    
+        for i in range(random_ibl_num):
+            lights[i], shadows[i] = self.get_data(random_lists[i])
+            
+        light_img, shadow_img = self.render_new_shadow(lights, shadows)
         
-        # print('random num: {}, list size: {}, shadow size: {}'.format(random_ibl_num,  len(light_list),  len(shadow_list)))
-        # self.get_min_max(light_img,'light')
-        # self.get_min_max(shadow_img,'shadow')
-        
+        mask_img,_,_ = self.get_data(random_lists[0], True)
         mask_img, shadow_img, light_img = self.to_tensor(mask_img), self.to_tensor(shadow_img),self.to_tensor(light_img)
         
-        return mask_img, light_img, shadow_img
+        return mask_img, light_img, shadow_img, random_ibl_num
     
     def get_prefix(self, path):
         return path[0:path.find('_')]
@@ -168,44 +171,51 @@ class SSN_Dataset(Dataset):
         self.meta_data = tmp_list
         self.mappings = dict()
         for r in self.meta_data:
-            # model, rotation, camera position
-            key = (os.path.basename(r[0]), r[-3],r[-2]) 
-            if key in self.mappings.keys():
-                self.mappings[key].append(r)
-            else:
-                self.mappings[key] = []
-                self.mappings[key].append(r)
-        # import pdb; pdb.set_trace()
+            key = self.get_key(r)
+            if not key in self.mappings.keys():
+                self.mappings[key] = {group_id:[] for group_id in range(len(self.ibl_group_id_list))}
+                
+            group_num = r[8]
+            self.mappings[key][group_num].append(r)
     
     def render_new_shadow(self, ibls, shadows):
-        assert len(ibls) == len(shadows)
+        shadow_num = shadows.shape[0]
         
-#         ibl_channel = self.ibl_num 
-#         h,w,c = ibls[0].shape
-#         new_ibl = np.zeros((h, w, ibl_channel), dtype=ibls[0].dtype) 
-
-#         for i in range(len(ibls)):
-#             # self.get_min_max(ibls[i], 'channel {}'.format(i))
-#             new_ibl[:,:,i] = np.squeeze(ibls[i]) 
-        
-#         # shuffle channel
-#         new_ibl = np.transpose(new_ibl,(2,0,1))
-#         np.random.shuffle(new_ibl)
-#         new_ibl = np.transpose(new_ibl, (1,2,0))
-        
-        scale_factor = 1.0
         if self.scale_ibl:
-            scale_factor = random.random()
+            scale_factor = np.random.rand(shadow_num)
+        else:
+            scale_factor = np.ones(shadow_num)
             
-        new_ibl = ibls[0] * scale_factor        
-        new_shadow = shadows[0] * scale_factor
+        ibls, shadows = np.array(ibls), np.array(shadows)
+        new_ibl = np.tensordot(ibls, scale_factor, ([0],[0]))
+        new_shadow = np.tensordot(shadows, scale_factor, ([0],[0]))
 
-        for i in range(1, len(shadows)):
-            if self.scale_ibl: 
-                scale_factor = random.random()
-            new_ibl += ibls[i] * scale_factor
-            new_shadow += shadows[i] * scale_factor
+#         new_ibl, new_shadow = ibls[0] * scale_factor[0], shadows[0] * scale_factor[0]
+#         for i in range(1, len(ibls)):
+#             new_ibl += ibls[i] * scale_factor[i]
+#             new_shadow += shadows[i] * scale_factor[i]
+    
         return new_ibl, new_shadow
     
     def get_min_max(self, batch_data, name):
         print('{} min: {}, max: {}'.format(name, np.min(batch_data), np.max(batch_data)))
+        
+    def get_key(self, r):
+        # model, rotation, camera position
+        key = (os.path.basename(r[0]), r[5],r[4]) 
+        return key
+    
+    def get_data(self, metadata_row, is_mask=False):
+        mask_path, light_path, shadow_path = metadata_row[1], metadata_row[7], metadata_row[2]
+        # convert image to [0.0, 1.0] numpy 
+        if is_mask:
+            mask_img = self.mask_transfrom(Image.open(mask_path))
+            # light_img = self.ibl_transform(Image.open(light_path))
+            light_img = np.expand_dims(np.load(light_path),2)
+            shadow_img = self.mask_transfrom(Image.open(shadow_path))
+            return mask_img, light_img, 1.0-shadow_img
+        else:
+            # light_img = self.ibl_transform(Image.open(light_path))
+            light_img = np.expand_dims(np.load(light_path),2)
+            shadow_img = self.mask_transfrom(Image.open(shadow_path))
+            return light_img, 1.0-shadow_img

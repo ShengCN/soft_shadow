@@ -38,7 +38,7 @@ def save_loss(figure_fname, train_loss, valid_loss):
     plt.legend(['train_loss', 'valid_loss'])
     plt.savefig(figure_fname)
 
-def save_model(output_folder, model, optimizer, epoch, best_loss, exp_name, hist_train_loss, hist_valid_loss, multi_gpu):
+def save_model(output_folder, model, optimizer, epoch, best_loss, exp_name, hist_train_loss, hist_valid_loss, params):
     """ Save current best model into some folder """
     create_folder(output_folder)
 
@@ -46,7 +46,7 @@ def save_model(output_folder, model, optimizer, epoch, best_loss, exp_name, hist
     output_fname = os.path.join(output_folder, exp_name + '_' + cur_time_stamp + ".pt")
 
     tmp_model = model
-    if multi_gpu:
+    if params.multi_gpu:
         tmp_model = model.module
 
     torch.save({
@@ -55,7 +55,8 @@ def save_model(output_folder, model, optimizer, epoch, best_loss, exp_name, hist
         'model_state_dict': tmp_model.state_dict(),
         'optimizer_state_dict': optimizer.state_dict(),
         'hist_train_loss': hist_train_loss,
-        'hist_valid_loss': hist_valid_loss
+        'hist_valid_loss': hist_valid_loss,
+        'params':str(params)
         }, output_fname)
 
 def get_lr(optimizer):

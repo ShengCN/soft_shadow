@@ -50,7 +50,7 @@ class Relight_SSN(nn.Module):
         x1 = self.in_conv(x)  # 29 x 256 x 256
         # print(x1.size())
         # import pdb; pdb.set_trace()
-        
+
         x1 = torch.cat((x, x1), dim=1)  # 32 x 256 x 256 todo_check the dim parameters
         # print(x1.size())
 
