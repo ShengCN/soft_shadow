@@ -139,7 +139,9 @@ class SSN_Dataset(Dataset):
         return mask_img, light_img, shadow_img, random_ibl_num
     
     def get_prefix(self, path):
-        return path[0:path.find('_')]
+        folder = os.path.dirname(path)
+        basename = os.path.basename(path)
+        return os.path.join(folder, basename[:basename.find('_')])
     
     # def downsample_light(self, img):
     #
@@ -186,15 +188,9 @@ class SSN_Dataset(Dataset):
         else:
             scale_factor = np.ones(shadow_num)
             
-        ibls, shadows = np.array(ibls), np.array(shadows)
         new_ibl = np.tensordot(ibls, scale_factor, ([0],[0]))
         new_shadow = np.tensordot(shadows, scale_factor, ([0],[0]))
 
-#         new_ibl, new_shadow = ibls[0] * scale_factor[0], shadows[0] * scale_factor[0]
-#         for i in range(1, len(ibls)):
-#             new_ibl += ibls[i] * scale_factor[i]
-#             new_shadow += shadows[i] * scale_factor[i]
-    
         return new_ibl, new_shadow
     
     def get_min_max(self, batch_data, name):
@@ -207,15 +203,19 @@ class SSN_Dataset(Dataset):
     
     def get_data(self, metadata_row, is_mask=False):
         mask_path, light_path, shadow_path = metadata_row[1], metadata_row[7], metadata_row[2]
+        prefix = self.get_prefix(metadata_row[1])
+        mask_path, light_path, shadow_path = prefix + '_mask.npy', prefix + '_light.npy', prefix + '_shadow.npy'
         # convert image to [0.0, 1.0] numpy 
         if is_mask:
-            mask_img = self.mask_transfrom(Image.open(mask_path))
+            # mask_img = self.mask_transfrom(Image.open(mask_path))
             # light_img = self.ibl_transform(Image.open(light_path))
+            # shadow_img = self.mask_transfrom(Image.open(shadow_path))
+            mask_img = np.expand_dims(np.load(mask_path),2)/255.0
+            shadow_img = np.expand_dims(np.load(shadow_path),2)/255.0
             light_img = np.expand_dims(np.load(light_path),2)
-            shadow_img = self.mask_transfrom(Image.open(shadow_path))
             return mask_img, light_img, 1.0-shadow_img
         else:
             # light_img = self.ibl_transform(Image.open(light_path))
+            shadow_img = np.expand_dims(np.load(shadow_path),2)/255.0
             light_img = np.expand_dims(np.load(light_path),2)
-            shadow_img = self.mask_transfrom(Image.open(shadow_path))
             return light_img, 1.0-shadow_img
