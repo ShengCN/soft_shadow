@@ -54,8 +54,10 @@ def render_worker(path_relative_vec):
     
     np.save(out_file, saved_np)
     
+dataset_folder = '/home/ysheng/Dataset/soft_shadow/train'
+processor_num = 256
 def parallel_render():
-    dataset_folder = '/home/ysheng/Dataset/soft_shadow/train'
+#     dataset_folder = '/home/ysheng/Dataset/soft_shadow/train'
     out_file = os.path.join(dataset_folder, "metadata.csv")
     with open(out_file) as f:
         csv_read = csv.reader(f, delimiter=',')
@@ -66,7 +68,6 @@ def parallel_render():
 
     task_num = len(mask_path_list) 
     print(task_num)    
-    processor_num = 512
     input_params = zip(mask_path_list, rel_vec_list)
     with multiprocessing.Pool(processor_num) as pool:
         # working_fn = partial(batch_working_process, src_folder, out_folder)
@@ -75,16 +76,27 @@ def parallel_render():
 
 def resize_worker(path):
     mask, shadow = path
-    img = Image.open(shadow)
-    img = img.resize((256,256))
-    img.save(shadow)
-    
     img = Image.open(mask)
     img = img.resize((256,256))
-    img.save(mask)    
+    # img.save(shadow)
+    img = np.array(img)
+    img = img[:,:,0]
+    
+    dirname = os.path.dirname(mask)
+    basename = os.path.splitext(os.path.basename(mask))[0]
+    np.save(os.path.join(dirname, basename + ".npy"), img)
+
+    img = Image.open(shadow)
+    img = img.resize((256,256))
+    # img.save(mask)   
+    img = np.array(img)
+    img = img[:,:,0]
+
+    basename = os.path.splitext(os.path.basename(shadow))[0]
+    np.save(os.path.join(dirname, basename + ".npy"), img)
             
 def parallel_resize():
-    dataset_folder = '/home/ysheng/Dataset/soft_shadow/train'
+#     dataset_folder = '/home/ysheng/Dataset/soft_shadow/train'
     out_file = os.path.join(dataset_folder, "metadata.csv")
     with open(out_file) as f:
         csv_read = csv.reader(f, delimiter=',')
@@ -96,17 +108,17 @@ def parallel_resize():
 
     task_num = len(mask_path_list) 
     print(task_num)    
-    processor_num = 512
     
     input_list = zip(mask_path_list, shadow_path_list)
     with multiprocessing.Pool(processor_num) as pool:
         # working_fn = partial(batch_working_process, src_folder, out_folder)
         for i, _ in enumerate(pool.imap_unordered(resize_worker, input_list), 1):
             print("Finished: {} \r".format(float(i)/task_num), flush=True, end='')
+
             
 if __name__ == '__main__':
     print('begin light')
-    parallel_render()
+    # parallel_render()
     print('end light')
     
     print('begin resize')

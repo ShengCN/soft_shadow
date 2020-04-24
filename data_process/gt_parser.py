@@ -6,6 +6,8 @@ from utils_file import get_all_folders
 import csv
 from tqdm import tqdm
 import numpy as np
+import multiprocessing
+from functools import partial
 
 """ Parse the GT file to get result dict
     (prefix) -> {values}
@@ -49,39 +51,47 @@ def parse(file_path):
     return gt_dict
 
 
-def parse_folder(folder, out_file):
+def parse_worker(cur_folder):
+    gt_file = os.path.join(cur_folder, "ground_truth.txt")
+    gt_dict = parse(gt_file)
+    lines = ""
+    for key, value in gt_dict.items():
+        prefix = "imgs/{:07d}".format(int(key))
+        mask_file = os.path.join(cur_folder, prefix.split()[0] + "_mask.png")
+        shadow_file = os.path.join(cur_folder, prefix.split()[0] + "_shadow.png")
+        light_file = os.path.join(cur_folder, prefix.split()[0] + "_light.png")
+        light_np_file = os.path.join(cur_folder, prefix.split()[0] + "_light.npy")
+
+        human_pos,light_pos = value['human_position'],value['light_position']
+        human_pos = np.array([float(human_pos[0]), float(human_pos[1]), float(human_pos[2])])
+        light_pos = np.array([float(light_pos[0]), float(light_pos[1]),float(light_pos[2])])
+        relative_pos = light_pos - human_pos
+        relative_pos_str = '{}_{}_{}'.format(relative_pos[0], relative_pos[1], relative_pos[2])
+        camera_pos = '{}_{}_{}'.format(value['camera_position'][0], value['camera_position'][1], value['camera_position'][2])
+        human_rot = value['human_rotation_alpha']
+        group_num = value['group_num']
+        lines += '{},{},{},{},{},{},{},{},{}\n'.format(cur_folder, 
+                                                       mask_file, 
+                                                       shadow_file, 
+                                                       light_file,
+                                                       camera_pos, 
+                                                       human_rot,
+                                                       relative_pos_str, 
+                                                       light_np_file, 
+                                                       group_num)
+    return lines
+
+def parse_folder(folder, out_file, processor_num = 256):
     """ parse sub-folders from folder and generate a metadata csv file """
     folders = get_all_folders(folder)
+    path_folders = [os.path.join(folder, f) for f in folders ]
+    
     lines = ""
-    for f in folders:
-        cur_folder = os.path.join(folder, f)
-        
-        gt_file = os.path.join(cur_folder, "ground_truth.txt")
-        gt_dict = parse(gt_file)
-        for key, value in gt_dict.items():
-            prefix = "imgs/{:07d}".format(int(key))
-            mask_file = os.path.join(cur_folder, prefix.split()[0] + "_mask.png")
-            shadow_file = os.path.join(cur_folder, prefix.split()[0] + "_shadow.png")
-            light_file = os.path.join(cur_folder, prefix.split()[0] + "_light.png")
-            light_np_file = os.path.join(cur_folder, prefix.split()[0] + "_light.npy")
-            
-            human_pos,light_pos = value['human_position'],value['light_position']
-            human_pos = np.array([float(human_pos[0]), float(human_pos[1]), float(human_pos[2])])
-            light_pos = np.array([float(light_pos[0]), float(light_pos[1]),float(light_pos[2])])
-            relative_pos = light_pos - human_pos
-            relative_pos_str = '{}_{}_{}'.format(relative_pos[0], relative_pos[1], relative_pos[2])
-            camera_pos = '{}_{}_{}'.format(value['camera_position'][0], value['camera_position'][1], value['camera_position'][2])
-            human_rot = value['human_rotation_alpha']
-            group_num = value['group_num']
-            lines += '{},{},{},{},{},{},{},{},{}\n'.format(cur_folder, 
-                                                           mask_file, 
-                                                           shadow_file, 
-                                                           light_file,
-                                                           camera_pos, 
-                                                           human_rot,
-                                                           relative_pos_str, 
-                                                           light_np_file, 
-                                                           group_num)
+    task_num = len(path_folders)
+    with multiprocessing.Pool(processor_num) as pool:
+        for i, line in enumerate(pool.imap_unordered(parse_worker, path_folders), 1):
+            lines += line
+            print("Finished: {} \r".format(float(i)/task_num), flush=True, end='')
     
     with open(out_file, "w+") as f:
         f.write(lines)
