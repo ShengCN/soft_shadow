@@ -53,7 +53,10 @@ def multithreading_post_process(folder, base_size=16):
 
     for key_id, key in enumerate(group_data.keys()):
         # prepare mask
-        
+        prefix = group_data[key][(x_begin,y_begin)]
+        mask_np = plt.imread(os.path.join(img_folder, '{}_mask.png'.format(prefix)))
+        mask_output = os.path.join(output_folder, '{:03d}_mask.npy'.format(key_id))
+        np.save(mask_output, mask_np)
 
         # prepare shadow
         input_list = []
