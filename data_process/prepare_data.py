@@ -12,7 +12,7 @@ def base_compute(input):
     x, y, shadow_list = input
     ret_np = np.zeros((256,256))
     for shadow_path in shadow_list:
-        ret_np += plt.imread(shadow_path)[:,:,0]
+        ret_np += 1.0 - plt.imread(shadow_path)[:,:,0]
 
     return x,y, ret_np
 
@@ -56,7 +56,7 @@ def multithreading_post_process(folder, base_size=16):
         prefix = group_data[key][(x_begin,y_begin)]
         mask_np = plt.imread(os.path.join(img_folder, '{}_mask.png'.format(prefix)))
         mask_output = os.path.join(output_folder, '{:03d}_mask.npy'.format(key_id))
-        np.save(mask_output, mask_np)
+        np.save(mask_output, mask_np[:,:,0])
 
         # prepare shadow
         input_list = []
@@ -80,7 +80,7 @@ def multithreading_post_process(folder, base_size=16):
                 print("Finished: {} \r".format(float(i) / task_num), flush=True, end='')
 
 
-        output_path = os.path.join(output_folder, '{:03d}'.format(key_id))
+        output_path = os.path.join(output_folder, '{:03d}_shadow.npy'.format(key_id))
         np.save(output_path, group_np)
         del group_np
 
@@ -160,6 +160,6 @@ if __name__ == '__main__':
     begin = time.time()
     folder =  '/home/ysheng/Dataset/soft_shadow/new_dataset/notsimulated_combine_male_short_outfits_genesis8_armani_casualoutfit03_Base_Pose_Standing_A'
     # memory_post_process(folder)
-    multithreading_post_process(folder)
+    multithreading_post_process(folder,16)
     end = time.time()
     print('time: {}'.format(end-begin))

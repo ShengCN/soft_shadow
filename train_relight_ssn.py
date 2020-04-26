@@ -64,7 +64,7 @@ def training_iteration(model, train_dataloder, optimizer, train_loss, epoch_num)
 
         vis_predicted_img = torch.zeros(1)
         for j in range(params.timers):
-            for i, (mask, light, shadow, ibl_num) in enumerate(train_dataloder):
+            for i, (mask, light, shadow) in enumerate(train_dataloder):
                 I_s, L_t, I_t = mask.to(device), light.to(device), shadow.to(device)
 
                 optimizer.zero_grad()
@@ -82,7 +82,7 @@ def training_iteration(model, train_dataloder, optimizer, train_loss, epoch_num)
                 
                 # visualize results
                 if i % 10 == 0:
-                    vis_predicted_img = predicted_img.detach().cpu()
+                    vis_predicted_img = predicted_img.detach().cpu()/6000.0
                     vis_predicted_img_gt = I_t.detach().cpu()
 
                     batch_size, c, h, w = vis_predicted_img.size()
@@ -118,7 +118,7 @@ def validation_iteration(model, valid_dataloader, valid_loss, epoch_num):
             vis_predicted_img = torch.zeros(1)
 
             for j in range(params.timers):
-                for i, (mask, light, shadow, ibl_num) in enumerate(valid_dataloader):
+                for i, (mask, light, shadow) in enumerate(valid_dataloader):
                     I_s = mask.to(device)
                     L_t = light.to(device)
                     I_t = shadow.to(device)
@@ -133,7 +133,7 @@ def validation_iteration(model, valid_dataloader, valid_loss, epoch_num):
 
                     # visualize results
                     if i % 10 == 0:
-                        vis_predicted_img = predicted_img.detach().cpu()
+                        vis_predicted_img = predicted_img.detach().cpu()/6000.0
                         vis_predicted_img_gt = I_t.detach().cpu()
 
                         batch_size, c, h, w = vis_predicted_img.size()
@@ -164,7 +164,7 @@ def train(params):
     hist_valid_loss = []
 
     # dataset
-    ds_csv = "~/Dataset/soft_shadow/train/metadata.csv"
+    ds_csv = "/home/ysheng/Dataset/soft_shadow/new_dataset/metadata.csv"
     train_set = SSN_Dataset(ds_csv, True)
     train_dataloder = DataLoader(train_set, batch_size=params.batch_size, shuffle=True, num_workers=params.workers, drop_last=True)
     valid_set = SSN_Dataset(ds_csv, False)
