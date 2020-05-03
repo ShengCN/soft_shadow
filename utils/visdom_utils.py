@@ -51,7 +51,7 @@ def normalize_img(imgs):
     imgs = torch.clamp(imgs, 0.0,1.0)
     return imgs
 
-def visdom_show_batch(imgs, win_name=None, exp=0, nrow=4, normalize=True):
+def visdom_show_batch(imgs, win_name=None, exp=0, nrow=2, normalize=True):
     cur_viz = get_current_viz(exp)
     if normalize:
         imgs = normalize_img(imgs)

@@ -2,13 +2,11 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 import torch.optim as optim
-import torchvision
-import torchvision.transforms as transforms
+from torchvision import utils
 import time
 from tqdm import tqdm
 import numpy as np
 import os
-import math
 import datetime
 
 from ssn.ssn_dataset import SSN_Dataset
@@ -54,6 +52,30 @@ def reconstruct_loss(gt_img, pred_img):
     """ M * (I-I') """
     return torch.norm(gt_img-pred_img, 2)
 
+def get_grid_img(tensor_img):
+    return utils.make_grid(tensor_img).detach().cpu().unsqueeze(0)
+
+def visdom_plot_img(I_t, predicted_img, mask, L_t, is_training=True):
+    batch_size = min(I_t.shape[0], 4)
+
+    vis_predicted_img = get_grid_img(predicted_img[:batch_size])
+    vis_predicted_img_gt = get_grid_img(I_t[:batch_size])
+    # import pdb; pdb.set_trace()
+
+    vis_shadow_img = torch.cat((vis_predicted_img_gt,
+                                vis_predicted_img))
+
+    if is_training:
+        win_prefix = 'train'
+    else:
+        win_prefix = 'valid'
+    vis_mask = get_grid_img(mask[:batch_size])
+    visdom_show_batch(vis_mask, win_name="{} masks".format(win_prefix), exp=exp, normalize=False)
+    visdom_show_batch(vis_shadow_img, win_name="{} shadow gt vs. inference".format(win_prefix), exp=exp, normalize=False)
+
+    if not params.new_ibl:
+        visdom_show_batch(get_grid_img(L_t[:batch_size]), win_name='{} light'.format(win_prefix), exp=exp, normalize=True)
+
 def training_iteration(model, train_dataloder, optimizer, train_loss, epoch_num):
     # training
     cur_epoch_loss = 0.0
@@ -62,7 +84,6 @@ def training_iteration(model, train_dataloder, optimizer, train_loss, epoch_num)
     with tqdm(total=len(train_dataloder) * params.timers) as t:
         t.set_description("Ep. {}".format(epoch_num))
 
-        vis_predicted_img = torch.zeros(1)
         for j in range(params.timers):
             for i, (mask, light, shadow) in enumerate(train_dataloder):
                 I_s, L_t, I_t = mask.to(device), light.to(device), shadow.to(device)
@@ -82,22 +103,26 @@ def training_iteration(model, train_dataloder, optimizer, train_loss, epoch_num)
                 
                 # visualize results
                 if i % 10 == 0:
-                    vis_predicted_img = predicted_img.detach().cpu()/6000.0
-                    vis_predicted_img_gt = I_t.detach().cpu()
+                    # vis_predicted_img = get_grid_img(predicted_img)
+                    # vis_predicted_img_gt = get_grid_img(I_t)
+                    #
+                    # batch_size, c, h, w = vis_predicted_img.size()
+                    #
+                    # random_batch = min(4, batch_size)
+                    # vis_shadow_img = torch.cat((vis_predicted_img_gt[0:random_batch, :, :, :].view(random_batch, 1, h, w),
+                    #                             vis_predicted_img[0:random_batch, :, :, :].view(random_batch,1,h, w)))
+                    #
+                    # # torchvision.utils.save_image(predicted_img[0:random_batch, 0, :, :].view(random_batch, 1,h, w), "{}_shadow.png".format(exp_name), nrow=4)
+                    # visdom_show_batch(mask[:random_batch,:,:,:], win_name="train masks", exp=exp)
+                    # visdom_show_batch(vis_shadow_img, win_name="train shadow gt vs. inference", exp=exp)
+                    #
+                    # if not params.new_ibl:
+                    #     visdom_show_batch(L_t[:random_batch,:,:,:], win_name='light', exp=exp, normalize=True)
+                    divide_factor = 1.0 / torch.max(L_t) / 5.0
+                    visdom_plot_img(torch.clamp(I_t* divide_factor, 0.0, 1.0),
+                                torch.clamp(predicted_img * divide_factor, 0.0, 1.0),
+                                mask, L_t)
 
-                    batch_size, c, h, w = vis_predicted_img.size()
-
-                    random_batch = min(4, batch_size)
-                    vis_shadow_img = torch.cat((vis_predicted_img_gt[0:random_batch, :, :, :].view(random_batch, 1, h, w), 
-                                                vis_predicted_img[0:random_batch, :, :, :].view(random_batch,1,h, w)))
-
-                    # torchvision.utils.save_image(predicted_img[0:random_batch, 0, :, :].view(random_batch, 1,h, w), "{}_shadow.png".format(exp_name), nrow=4)
-                    visdom_show_batch(mask[:random_batch,:,:,:], win_name="train masks", exp=exp)
-                    visdom_show_batch(vis_shadow_img, win_name="train shadow gt vs. inference", exp=exp)
-                    
-                    if not params.new_ibl:
-                        visdom_show_batch(L_t[:random_batch,:,:,:], win_name='light', exp=exp, normalize=True)
-                    
                 # keep tracking
                 train_loss.append(loss.item()/np.sqrt(params.batch_size))
                 visdom_plot_loss("train_total_loss", train_loss, exp)
@@ -115,9 +140,7 @@ def validation_iteration(model, valid_dataloader, valid_loss, epoch_num):
     with torch.no_grad():
         with tqdm(total=len(valid_dataloader) * params.timers) as t:
             t.set_description("(Validation)Ep. {} ".format(epoch_num))
-            vis_predicted_img = torch.zeros(1)
-
-            for j in range(params.timers):
+            for j in range(1):
                 for i, (mask, light, shadow) in enumerate(valid_dataloader):
                     I_s = mask.to(device)
                     L_t = light.to(device)
@@ -133,19 +156,22 @@ def validation_iteration(model, valid_dataloader, valid_loss, epoch_num):
 
                     # visualize results
                     if i % 10 == 0:
-                        vis_predicted_img = predicted_img.detach().cpu()/6000.0
-                        vis_predicted_img_gt = I_t.detach().cpu()
+#                         vis_predicted_img = get_grid_img(predicted_img)
+#                         vis_predicted_img_gt = get_grid_img(I_t)
+#
+#                         c, h, w = vis_predicted_img.size()
+#                         vis_shadow_img = torch.cat((vis_predicted_img_gt.view(random_batch, 1, h, w),
+#                                                     vis_predicted_img[0:random_batch, :, :, :].view(random_batch, 1, h, w)))
+# #                         torchvision.utils.save_image(predicted_img[0:random_batch, :, :, :].view(random_batch, 1, h, w),
+# #                                                      "valid_{}_shadow.png".format(exp_name), nrow=4,
+# #                                                      normalize=True)
+#                         visdom_show_batch(mask[:random_batch,:,:,:], win_name="valid masks", exp=exp)
+#                         visdom_show_batch(vis_shadow_img, win_name="valid shadow gt vs. inference", exp=exp)
+                        divide_factor = 1.0 / torch.max(L_t) / 5.0
+                        visdom_plot_img(torch.clamp(I_t * divide_factor, 0.0, 1.0),
+                                        torch.clamp(predicted_img * divide_factor, 0.0, 1.0),
+                                        mask, L_t, False)
 
-                        batch_size, c, h, w = vis_predicted_img.size()
-                        random_batch = min(4, batch_size)
-                        vis_shadow_img = torch.cat((vis_predicted_img_gt[0:random_batch, :, :, :].view(random_batch, 1, h, w),
-                                                    vis_predicted_img[0:random_batch, :, :, :].view(random_batch, 1, h, w)))
-#                         torchvision.utils.save_image(predicted_img[0:random_batch, :, :, :].view(random_batch, 1, h, w),
-#                                                      "valid_{}_shadow.png".format(exp_name), nrow=4,
-#                                                      normalize=True)
-                        visdom_show_batch(mask[:random_batch,:,:,:], win_name="valid masks", exp=exp)
-                        visdom_show_batch(vis_shadow_img, win_name="valid shadow gt vs. inference", exp=exp)
-                        
                     # keep tracking
                     valid_loss.append(loss.item()/np.sqrt(params.batch_size))
 
@@ -166,9 +192,9 @@ def train(params):
     # dataset
     ds_csv = "/home/ysheng/Dataset/soft_shadow/new_dataset/metadata.csv"
     train_set = SSN_Dataset(ds_csv, True)
-    train_dataloder = DataLoader(train_set, batch_size=params.batch_size, shuffle=True, num_workers=params.workers, drop_last=True)
+    train_dataloder = DataLoader(train_set, batch_size= min(len(train_set), params.batch_size), shuffle=True, num_workers=params.workers, drop_last=True)
     valid_set = SSN_Dataset(ds_csv, False)
-    valid_dataloader = DataLoader(valid_set, batch_size=params.batch_size, shuffle=False, num_workers=params.workers, drop_last=True)
+    valid_dataloader = DataLoader(valid_set, batch_size= min(len(valid_set), params.batch_size), shuffle=False, num_workers=params.workers, drop_last=True)
 
     # model & optimizer & scheduler & loss function
     model = Relight_SSN(1, 1)    # input is mask + human
