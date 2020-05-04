@@ -190,7 +190,7 @@ def train(params):
     hist_valid_loss = []
 
     # dataset
-    ds_csv = "/home/ysheng/Dataset/soft_shadow/new_dataset/metadata.csv"
+    ds_csv = "/home/ysheng/Dataset/new_dataset/meta_data.csv"
     train_set = SSN_Dataset(ds_csv, True)
     train_dataloder = DataLoader(train_set, batch_size= min(len(train_set), params.batch_size), shuffle=True, num_workers=params.workers, drop_last=True)
     valid_set = SSN_Dataset(ds_csv, False)

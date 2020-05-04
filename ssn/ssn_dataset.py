@@ -116,8 +116,8 @@ class SSN_Dataset(Dataset):
         
         random.seed(idx * 1234 + os.getpid() + time.time())
         # random ibls
-        mask_path, shadow_path = self.meta_data[idx]
-        mask_img, shadow_bases = np.expand_dims(np.load(mask_path),2), np.load(shadow_path)
+        shadow_path, mask_path = self.meta_data[idx]
+        mask_img, shadow_bases = np.expand_dims(np.load(mask_path), axis=2), np.load(shadow_path)
         shadow_img, light_img = self.render_new_shadow(shadow_bases)
         del shadow_bases
         # print('mask: {}, shadow: {}, light: {}'.format(mask_img.shape, shadow_img.shape, light_img.shape))
@@ -150,7 +150,7 @@ class SSN_Dataset(Dataset):
     
     def get_min_max(self, batch_data, name):
         print('{} min: {}, max: {}'.format(name, np.min(batch_data), np.max(batch_data)))
-        
+
     def random_pattern(self):
         seed = random.randint(0,19920208)
         gs = ig.Composite(operator=np.add,
