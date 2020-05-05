@@ -16,6 +16,7 @@ import matplotlib.pyplot as plt
 from params import params
 import numbergen as ng
 import imagen as ig
+from .random_pattern import random_pattern
 
 class To_Normalized_Img(object):
     """Convert PIL image to [0,1] numpy"""
@@ -90,13 +91,11 @@ class SSN_Dataset(Dataset):
         self.scale_ibl = parameter.scale_ibl
         self.ibl_shape = [16, 32, 1]
         self.shadow_shape = [256, 256, 1]
-#         self.ibl_pattern_generator = ig.Composite(operator=np.add,
-#                                                   generators=[ig.Gaussian(size=0.15,
-#                                                                           x=ng.UniformRandom(seed=i+1)-0.5,
-#                                                                           y=ng.UniformRandom(seed=i+2)-0.5,
-#                                                                           orientation=np.pi*ng.UniformRandom(seed=i+3))
-#                                                                 for i in range(10)])
-    
+        self.random_pattern_generator = random_pattern()
+        
+        self.thread_id = os.getpid()
+        self.need_log = parameter.log
+
     def __len__(self):
         if self.is_training:
             return self.training_num
@@ -114,12 +113,28 @@ class SSN_Dataset(Dataset):
         if not self.is_training:
             idx = self.training_num + idx
         
+        is_log = False
+        if idx % 10 == 0 and self.thread_id == os.getpid() and self.need_log:
+            is_log = True
+        
         random.seed(idx * 1234 + os.getpid() + time.time())
         # random ibls
-        shadow_path, mask_path = self.meta_data[idx]
+        if is_log:
+            s = time.time()
+        shadow_path, mask_path = self.meta_data[idx]  
         mask_img, shadow_bases = np.expand_dims(np.load(mask_path), axis=2), np.load(shadow_path)
+        if is_log:
+            elapsed = time.time() - s
+            log_info = '{} loading file time: {} \n'.format(idx, elapsed)
+
+        if is_log:
+            s = time.time()  
         shadow_img, light_img = self.render_new_shadow(shadow_bases)
-        del shadow_bases
+        if is_log:
+            elapsed = time.time() - s
+            log_info += '{} rendering file time: {} \n'.format(idx, elapsed)
+            self.log(log_info)
+            
         # print('mask: {}, shadow: {}, light: {}'.format(mask_img.shape, shadow_img.shape, light_img.shape))
         mask_img, shadow_img, light_img = self.to_tensor(mask_img), self.to_tensor(shadow_img),self.to_tensor(light_img)
         
@@ -141,7 +156,9 @@ class SSN_Dataset(Dataset):
     
     def render_new_shadow(self, shadow_bases):
         h, w, iw, ih = shadow_bases.shape
-        pattern_img = self.random_pattern()
+
+        num = random.randint(0, 50)
+        pattern_img = self.random_pattern_generator.get_pattern(num=num)
         pattern_img = resize(pattern_img, (ih, iw))
         shadow = np.tensordot(shadow_bases, pattern_img, axes=([2,3], [1,0]))
         pattern_img = np.expand_dims(resize(pattern_img, (16,32)), 2)
@@ -151,15 +168,6 @@ class SSN_Dataset(Dataset):
     def get_min_max(self, batch_data, name):
         print('{} min: {}, max: {}'.format(name, np.min(batch_data), np.max(batch_data)))
 
-    def random_pattern(self):
-        seed = random.randint(0,19920208)
-        gs = ig.Composite(operator=np.add,
-                          generators=[ig.Gaussian(size=0.1,
-                                      x=ng.UniformRandom(seed=seed+i+1)-0.5,
-                                      y=ng.UniformRandom(seed=seed+i+2)-0.5,
-                                      orientation=np.pi*ng.UniformRandom(seed=seed+i+3),
-                                      aspect_ratio=1.0/0.71) for i in range(50)])
-        ret = gs()
-        ret = np.power(ret, 3)
-        ret = ret/np.max(ret) * 3.0
-        return ret
+    def log(self, log_info):
+        with open('log.txt', 'a+') as f:
+            f.write(log_info)

@@ -16,6 +16,7 @@ class params():
             self.small_ds = False
             self.new_ibl = False
             self.multi_gpu = False
+            self.log = True
             
         def set_params(self, options):
             self.options = options
@@ -29,6 +30,7 @@ class params():
             self.small_ds = options.small_ds
             self.new_ibl = options.new_ibl
             self.multi_gpu = options.multi_gpu
+            self.log = options.log
             
         def __str__(self):
             return 'norm: {} bilinear: {} activation: {} prelu: {} ibl: {} weight decay: {} scale_ibl: {} small ds: {}'.format(self.norm, 
@@ -76,7 +78,7 @@ def parse_params():
     parser.add_argument('--double_conv', action='store_true', help='use group norm')
     parser.add_argument('--small_ds', action='store_true', help='small dataset')
     parser.add_argument('--new_ibl', action='store_true', help='use new ibl represetation') 
-    
+    parser.add_argument('--log', action='store_true', help='log information')
     parser.add_argument('--ibl_num', type=int, default=24, help='maximum ibl number during training')
     parser.add_argument('--weight_decay', type=float, default=4e-5, help='weight decay for model weight')
     

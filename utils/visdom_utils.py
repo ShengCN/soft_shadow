@@ -32,13 +32,6 @@ def guassian_light(light_tensor):
         
     return tensor_ret
 
-def decouple_image(mask_shadow):
-    """ Decouple mask and shadow channels and merge them together """
-    mask = mask_shadow[:, 0:3, :, :]
-    shadow = mask_shadow[:, 3:, :, :]
-
-    return mask, shadow
-
 def normalize_img(imgs):
     b,c,h,w = imgs.shape
     gt_batch = b//2
@@ -64,7 +57,6 @@ def visdom_show_batch(imgs, win_name=None, exp=0, nrow=2, normalize=True):
 def visdom_show_light(imgs, win_name=None, exp=0, nrow=2):
     cur_viz = get_current_viz(exp)
     #     imgs = torch.clamp(imgs/torch.max(imgs),0.0,1.0)    
-    
     imgs = normalize_img(imgs)
     if win_name is None:
         cur_viz.images(imgs, win="batch visualize",nrow=nrow)

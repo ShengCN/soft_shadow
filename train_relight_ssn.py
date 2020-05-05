@@ -64,14 +64,13 @@ def visdom_plot_img(I_t, predicted_img, mask, L_t, is_training=True):
 
     vis_shadow_img = torch.cat((vis_predicted_img_gt,
                                 vis_predicted_img))
-
     if is_training:
         win_prefix = 'train'
     else:
         win_prefix = 'valid'
     vis_mask = get_grid_img(mask[:batch_size])
     visdom_show_batch(vis_mask, win_name="{} masks".format(win_prefix), exp=exp, normalize=False)
-    visdom_show_batch(vis_shadow_img, win_name="{} shadow gt vs. inference".format(win_prefix), exp=exp, normalize=False)
+    visdom_show_batch(vis_shadow_img, win_name="{} shadow gt vs. inference".format(win_prefix), nrow=1,exp=exp, normalize=False)
 
     if not params.new_ibl:
         visdom_show_batch(get_grid_img(L_t[:batch_size]), win_name='{} light'.format(win_prefix), exp=exp, normalize=True)
@@ -103,21 +102,6 @@ def training_iteration(model, train_dataloder, optimizer, train_loss, epoch_num)
                 
                 # visualize results
                 if i % 10 == 0:
-                    # vis_predicted_img = get_grid_img(predicted_img)
-                    # vis_predicted_img_gt = get_grid_img(I_t)
-                    #
-                    # batch_size, c, h, w = vis_predicted_img.size()
-                    #
-                    # random_batch = min(4, batch_size)
-                    # vis_shadow_img = torch.cat((vis_predicted_img_gt[0:random_batch, :, :, :].view(random_batch, 1, h, w),
-                    #                             vis_predicted_img[0:random_batch, :, :, :].view(random_batch,1,h, w)))
-                    #
-                    # # torchvision.utils.save_image(predicted_img[0:random_batch, 0, :, :].view(random_batch, 1,h, w), "{}_shadow.png".format(exp_name), nrow=4)
-                    # visdom_show_batch(mask[:random_batch,:,:,:], win_name="train masks", exp=exp)
-                    # visdom_show_batch(vis_shadow_img, win_name="train shadow gt vs. inference", exp=exp)
-                    #
-                    # if not params.new_ibl:
-                    #     visdom_show_batch(L_t[:random_batch,:,:,:], win_name='light', exp=exp, normalize=True)
                     divide_factor = 1.0 / torch.max(L_t) / 5.0
                     visdom_plot_img(torch.clamp(I_t* divide_factor, 0.0, 1.0),
                                 torch.clamp(predicted_img * divide_factor, 0.0, 1.0),
@@ -137,10 +121,11 @@ def validation_iteration(model, valid_dataloader, valid_loss, epoch_num):
     cur_epoch_loss = 0.0
     model.eval()
 
+    cur_timer = 1
     with torch.no_grad():
         with tqdm(total=len(valid_dataloader) * params.timers) as t:
             t.set_description("(Validation)Ep. {} ".format(epoch_num))
-            for j in range(1):
+            for j in range(cur_timer):
                 for i, (mask, light, shadow) in enumerate(valid_dataloader):
                     I_s = mask.to(device)
                     L_t = light.to(device)
@@ -156,17 +141,6 @@ def validation_iteration(model, valid_dataloader, valid_loss, epoch_num):
 
                     # visualize results
                     if i % 10 == 0:
-#                         vis_predicted_img = get_grid_img(predicted_img)
-#                         vis_predicted_img_gt = get_grid_img(I_t)
-#
-#                         c, h, w = vis_predicted_img.size()
-#                         vis_shadow_img = torch.cat((vis_predicted_img_gt.view(random_batch, 1, h, w),
-#                                                     vis_predicted_img[0:random_batch, :, :, :].view(random_batch, 1, h, w)))
-# #                         torchvision.utils.save_image(predicted_img[0:random_batch, :, :, :].view(random_batch, 1, h, w),
-# #                                                      "valid_{}_shadow.png".format(exp_name), nrow=4,
-# #                                                      normalize=True)
-#                         visdom_show_batch(mask[:random_batch,:,:,:], win_name="valid masks", exp=exp)
-#                         visdom_show_batch(vis_shadow_img, win_name="valid shadow gt vs. inference", exp=exp)
                         divide_factor = 1.0 / torch.max(L_t) / 5.0
                         visdom_plot_img(torch.clamp(I_t * divide_factor, 0.0, 1.0),
                                         torch.clamp(predicted_img * divide_factor, 0.0, 1.0),
@@ -179,7 +153,7 @@ def validation_iteration(model, valid_dataloader, valid_loss, epoch_num):
                     t.update()
 
     # Finish one epoch
-    cur_epoch_loss /= (params.timers * len(valid_dataloader) * np.sqrt(params.batch_size)) 
+    cur_epoch_loss /= (params.timers * len(valid_dataloader) * np.sqrt(cur_timer)) 
     return cur_epoch_loss
 
 def train(params):
