@@ -119,7 +119,8 @@ def mitsuba_render(model_file, ibl_file, final_out_file, shadow_out_file, real_i
 
 
 def net_render(mask_file, ibl_file, out_file):
-    mask, ibl = to_tensor(np.expand_dims(np.load(mask_file), axis=2)), to_tensor(np.load(ibl_file))
+    mask, ibl = to_tensor(np.expand_dims(np.load(mask_file), axis=2)), to_tensor(np.expand_dims(cv2.resize(np.load(ibl_file), (32,16)), axis=2))
+    # import pdb; pdb.set_trace()
     with torch.no_grad():
         I_s, L_t = torch.unsqueeze(mask.to(device),0), torch.unsqueeze(ibl.to(device),0)
 
@@ -131,7 +132,7 @@ def net_render(mask_file, ibl_file, out_file):
 def merge_result(rendered_img, mask_file, shadow_img, out_file):
     pass
 
-def evaluate(model_file, mask_file, ibl_file,output, real_ibl=True):
+def evaluate(model_file, mask_file, ibl_file, output, real_ibl=True):
     """ output/mitsuba_final.png
         output/mitsuba_shadow.png
         output/mitsuba_merge.png
@@ -146,7 +147,8 @@ def evaluate(model_file, mask_file, ibl_file,output, real_ibl=True):
     # mitsuba_render(model_file, ibl_file, mitsuba_final, mitsuba_shadow_output, real_ibl)
 
     # call net render result
-    net_render(mask_file, ibl_file, net_shadow_output)
+    fname = os.path.splitext(ibl_file)[0]
+    net_render(mask_file, fname + ".npy", net_shadow_output)
 
     # merge result
     # merge_result(mitsuba_final, )
