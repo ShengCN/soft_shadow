@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <scene version="0.6.0">
-    <integrator type="path"/>
+    <integrator type="shadow_integrator"/>
     <sensor type="perspective">
         <string name="fovAxis" value="x"/>
         <float name="nearClip" value="0.100000"/>
@@ -13,8 +13,8 @@
             <integer name="sampleCount" value="$samples"/>
         </sampler>
         <film type="hdrfilm">
-            <integer name="width" value="$w"/>
-            <integer name="height" value="$h"/>
+            <integer name="width" value="512"/>
+            <integer name="height" value="512"/>
             <boolean name="banner" value="false"/>
             <rfilter type="gaussian"/>
         </film>
@@ -39,7 +39,7 @@
     <shape type="obj">
         <string name="filename" value="$ground"/>
         <transform name="toWorld">
-            <matrix value="100.000000 0.000000 0.000000 0.000000 0.000000 1.000000 0.000000 0.000000 0.000000 0.000000 100.000000 0.000000 0.000000 0.000000 0.000000 1.000000 "/>
+            <matrix value="20.000000 0.000000 0.000000 0.000000 0.000000 20.000000 0.000000 0.000000 0.000000 0.000000 20.000000 0.000000 0.000000 0.000000 0.000000 1.000000"/>
         </transform>
         <ref id="reflectance"/>
         <boolean name="ground" value="true"/>
@@ -48,7 +48,7 @@
         <string name="filename" value="$model"/>
         <transform name="toWorld">
             <matrix value="$world"/>
-            <!-- <matrix value="0.0048338 0 0 0.0068885 0.0 0.0048338  0.000000 0.0110922 0.000000 0.000000 0.0048338 -0.0205234 0.0 0.0 0.0 1 "/> -->
+            <!-- <matrix value="0.0048338 0 0 0 0.000000 0.0048338  0.000000 0.000000 0.000000 0.000000 0.0048338 0.000000 0.000000 0.000000 0.000000 1.000000 "/> -->
         </transform>
         <boolean name="render_target" value="true"/>
     </shape>

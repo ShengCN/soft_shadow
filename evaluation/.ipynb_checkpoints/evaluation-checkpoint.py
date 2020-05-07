@@ -7,33 +7,27 @@ import argparse
 import time
 from tqdm import tqdm
 from ssn.ssn import Relight_SSN
-from ssn.ssn_dataset import ToTensor
 import pickle
-import torch
-import numpy as np
-import cv2
 
 parser = argparse.ArgumentParser(description='evaluatoin pipeline')
 parser.add_argument('-f', '--file', type=str, help='input model file')
 parser.add_argument('-m', '--mask', type=str, help='mask file')
 parser.add_argument('-i', '--ibl', type=str, help='ibl file')
 parser.add_argument('-o', '--output', type=str, help='output folder')
-parser.add_argument('-w', '--weight', type=str, help='weight of current model', default='../weights/new_pattern_06-May-05-42-PM.pt')
+parser.add_argument('-w', '--weight', type=str, help='weight of current model', default='../weights/new_pattern_05-May-02-14-AM.pt')
 parser.add_argument('-v', '--verbose', action='store_true', help='output file name')
 
 options = parser.parse_args()
 print('options: ', options)
 
-device = torch.device("cpu")
-# device = torch.device("cuda:2" if torch.cuda.is_available() else "cpu")
-print("Device: ", device)
-model = Relight_SSN(1,1)
-weight_file = options.weight
-checkpoint = torch.load(weight_file, map_location=device)    
-model.to(device)
-model.load_state_dict(checkpoint['model_state_dict'])
-to_tensor = ToTensor()
-
+# device = torch.device("cpu")
+# # device = torch.device("cuda:2" if torch.cuda.is_available() else "cpu")
+# print("Device: ", device)
+# model = Relight_SSN(1,1)
+# weight_file = options.weight
+# checkpoint = torch.load(weight_file, map_location=device)    
+# model.to(device)
+# model.load_state_dict(checkpoint['model_state_dict'])
 cam_world_dict = {}
 def get_files(folder):
     return [join(folder, f) for f in os.listdir(folder) if os.path.isfile(join(folder, f))]
@@ -49,10 +43,10 @@ def parse_cam_world_str(lines):
         world += w + ' '
     return cam, world
 
-def parse_camera_world(update=True):
+def parse_camera_world():
     cam_world_file = './cam_world_dict.pkl'
     cam_world_dict = dict()
-    if not update and os.path.exists(cam_world_file):
+    if os.path.exists(cam_world_file):
         with open(cam_world_file, 'rb') as f:
             cam_world_dict = pickle.load(f)
     else:
@@ -72,14 +66,11 @@ def parse_camera_world(update=True):
                         lines.append(l.rstrip('\n'))
                 fname = os.path.splitext(os.path.basename(cam_world))[0]
                 cam_world_dict[basename][fname] = parse_cam_world_str(lines)
-        
-        with open(cam_world_file, 'wb') as handle:
-            pickle.dump(cam_world_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
     return cam_world_dict
 
 mts_final_xml,mts_shadow_xml = 'mts_final.xml', 'mts_shadow.xml'
-def mitsuba_render(model_file, ibl_file, final_out_file, shadow_out_file, real_ibl=True):
+def mitsuba_render(model_file, ibl_file, final_out_file, shadow_out_file):
     """ Input: mitsuba rendering related resources
         Output: rendered_gt, saved shadow image 
     """
@@ -99,65 +90,49 @@ def mitsuba_render(model_file, ibl_file, final_out_file, shadow_out_file, real_i
 
     final_cmd = 'mitsuba {} -Dw=256 -Dh=256 -Dsamples={} -Dori=\"{}\" -Dtarget=\"{}\" -Dup=\"{}\" -Dibl=\"{}\" -Dground={}\" -Dmodel=\"{}\" -Dworld=\"{}\" -o \"{}\"'.format(
         mts_final_xml, 4, cam[0], cam[1], cam[2], ibl_file, ground_path, model_file, world, final_out_file)
-    
-    # with open('test.txt','w+') as f:
-    #     f.write(shadow_cmd)
-    #     f.write('\n')
-    #     f.write(final_cmd)
+    with open('test.txt','w+') as f:
+        f.write(shadow_cmd)
+        f.write('\n')
+        f.write(final_cmd)
+
+    # print('shadow cmd: \n', shadow_cmd)
+    # print('final cmd: \n', final_cmd)
 
     os.system(shadow_cmd)
     mts_util_tonemapping_cmd = 'mtsutil tonemap {}'.format(shadow_out_file)
     os.system(mts_util_tonemapping_cmd)
 
     os.system(final_cmd)
-    if real_ibl:
-        tone_scale = 5.0
-    else:
-        tone_scale = 80
-    mts_util_tonemapping_cmd = 'mtsutil tonemap -m {} {}'.format(tone_scale, final_out_file)
+    mts_util_tonemapping_cmd = 'mtsutil tonemap -m {} {}'.format(1, final_out_file)
     os.system(mts_util_tonemapping_cmd)
 
 
 def net_render(mask_file, ibl_file, out_file):
-    mask, ibl = to_tensor(np.expand_dims(np.load(mask_file), axis=2)), to_tensor(np.load(ibl_file))
-    with torch.no_grad():
-        I_s, L_t = torch.unsqueeze(mask.to(device),0), torch.unsqueeze(ibl.to(device),0)
-
-        predicted_img, predicted_src_light = model(I_s, L_t)
-
-    shadow_predict = predicted_img[0].detach().cpu().numpy().transpose((1,2,0))
-    cv2.imwrite(out_file, shadow_predict)
+    pass
 
 def merge_result(rendered_img, mask_file, shadow_img, out_file):
     pass
 
-def evaluate(model_file, mask_file, ibl_file,output, real_ibl=True):
-    """ output/mitsuba_final.png
-        output/mitsuba_shadow.png
-        output/mitsuba_merge.png
-        output/prediction_shadow.png
-        output/predcition_merge.png
-    """
+def evaluate(model_file, mask_file, ibl_file, output):
     mitsuba_final = join(output, 'mitsuba_final.exr')
     mitsuba_shadow_output, mitsuba_merge = join(output, 'mitsuba_shadow.exr'), join(output, 'mitsuba_merge.png')
     net_shadow_output, net_merge = join(output, 'prediction_shadow.png'), join(output, 'prediction_merge.png')
 
     # call mitsuba render 
-    # mitsuba_render(model_file, ibl_file, mitsuba_final, mitsuba_shadow_output, real_ibl)
+    mitsuba_render(model_file, ibl_file, mitsuba_final, mitsuba_shadow_output)
 
     # call net render result
     net_render(mask_file, ibl_file, net_shadow_output)
 
     # merge result
-    # merge_result(mitsuba_final, )
+    merge_result(mitsuba_final, )
 
 if __name__ == '__main__':
     # evaluate(options.file, options.mask, options.ibl, options.output)
     model_file = '/Data_SSD/models/notsimulated_combine_male_short_outfits_genesis8_armani_casualoutfit03_Base_Pose_Standing_A/notsimulated_combine_male_short_outfits_genesis8_armani_casualoutfit03_Base_Pose_Standing_A.obj'
-    mask_file = '/Data_SSD/new_dataset/cache/mask/notsimulated_combine_male_short_outfits_genesis8_armani_casualoutfit03_Base_Pose_Standing_A/pitch_15_rot_0_mask.npy'
-    # ibl_file = '/home/ysheng/Dataset/ibls/real/20060430-01_hd.hdr'
+    mask_file = '/Data_SSD/new_dataset/cache/mask/notsimulated_combine_male_short_outfits_genesis8_armani_casualoutfit03_Base_Pose_Standing_A/pitch_15_rot_0_mask.png'
+    ibl_file = '/home/ysheng/Dataset/ibls/real/20060430-01_hd.hdr'
     # ibl_file = '../test_pattern.png'
-    ibl_file = '../test_pattern.png'
     output = 'dbg/'
     os.makedirs(output, exist_ok=True)
     evaluate(model_file, mask_file, ibl_file, output)

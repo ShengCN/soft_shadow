@@ -13,8 +13,9 @@
             <integer name="sampleCount" value="$samples"/>
         </sampler>
         <film type="hdrfilm">
-            <integer name="width" value="256"/>
-            <integer name="height" value="256"/>
+            <integer name="width" value="$w"/>
+            <integer name="height" value="$h"/>
+            <boolean name="banner" value="false"/>
             <rfilter type="gaussian"/>
         </film>
     </sensor>
@@ -38,7 +39,7 @@
     <shape type="obj">
         <string name="filename" value="$ground"/>
         <transform name="toWorld">
-            <matrix value="10.000000 0.000000 0.000000 0.000000 0.000000 10.000000 0.000000 0.000000 0.000000 0.000000 10.000000 0.000000 0.000000 0.000000 0.000000 1.000000 "/>
+            <matrix value="20.000000 0.000000 0.000000 0.000000 0.000000 20.000000 0.000000 0.000000 0.000000 0.000000 20.000000 0.000000 0.000000 0.000000 0.000000 1.000000"/>
         </transform>
         <ref id="reflectance"/>
         <boolean name="ground" value="true"/>
@@ -47,6 +48,7 @@
         <string name="filename" value="$model"/>
         <transform name="toWorld">
             <matrix value="$world"/>
+            <!-- <matrix value="0.0048338 0 0 0 0.000000 0.0048338  0.000000 0.000000 0.000000 0.000000 0.0048338 0.000000 0.000000 0.000000 0.000000 1.000000 "/> -->
         </transform>
         <boolean name="render_target" value="true"/>
     </shape>
