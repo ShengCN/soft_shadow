@@ -33,7 +33,7 @@ device = torch.device("cpu")
 # device = torch.device("cuda:2" if torch.cuda.is_available() else "cpu")
 print("Device: ", device)
 model = Relight_SSN(1,1)
-weight_file = os.path.join('weights', 'best_weights/48_ibl_scale_19-April-11-09-AM.pt')
+weight_file = os.path.join('../weights', 'new_pattern_06-May-05-42-PM.pt')
 # weight_file = os.path.join('weights', '1_ibl_14-April-10-34-PM.pt')
 
 checkpoint = torch.load(weight_file, map_location=device)    

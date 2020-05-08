@@ -102,7 +102,8 @@ def training_iteration(model, train_dataloder, optimizer, train_loss, epoch_num)
                 
                 # visualize results
                 if i % 10 == 0:
-                    divide_factor = 1.0 / torch.max(L_t) / 5.0
+                    # divide_factor = 1.0 / torch.max(L_t) / 5.0
+                    divide_factor = 1.0
                     visdom_plot_img(torch.clamp(I_t* divide_factor, 0.0, 1.0),
                                 torch.clamp(predicted_img * divide_factor, 0.0, 1.0),
                                 mask, L_t)
@@ -141,7 +142,8 @@ def validation_iteration(model, valid_dataloader, valid_loss, epoch_num):
 
                     # visualize results
                     if i % 10 == 0:
-                        divide_factor = 1.0 / torch.max(L_t) / 5.0
+                        # divide_factor = 1.0 / torch.max(L_t) / 5.0
+                        divide_factor = 1.0
                         visdom_plot_img(torch.clamp(I_t * divide_factor, 0.0, 1.0),
                                         torch.clamp(predicted_img * divide_factor, 0.0, 1.0),
                                         mask, L_t, False)

@@ -13,3 +13,5 @@ ssn/.ipynb_checkpoints/*
 utils/.ipynb_checkpoints/*
 data_process/.ipynb_checkpoints/*
 *.pdf
+dbg*/*
+dbg*

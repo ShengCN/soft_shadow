@@ -11,11 +11,9 @@ import pandas as pd
 from PIL import Image
 import time
 import random
-from skimage.transform import resize
 import matplotlib.pyplot as plt
+import cv2
 from params import params
-import numbergen as ng
-import imagen as ig
 from .random_pattern import random_pattern
 
 class To_Normalized_Img(object):
@@ -87,10 +85,6 @@ class SSN_Dataset(Dataset):
         if parameter.small_ds:
             self.training_num = self.training_num//30
         
-        self.ibl_num = parameter.ibl_num
-        self.scale_ibl = parameter.scale_ibl
-        self.ibl_shape = [16, 32, 1]
-        self.shadow_shape = [256, 256, 1]
         self.random_pattern_generator = random_pattern()
         
         self.thread_id = os.getpid()
@@ -135,7 +129,7 @@ class SSN_Dataset(Dataset):
             log_info += '{} rendering file time: {} \n'.format(idx, elapsed)
             self.log(log_info)
             
-        # print('mask: {}, shadow: {}, light: {}'.format(mask_img.shape, shadow_img.shape, light_img.shape))
+#         print('mask: {}, shadow: {}, light: {}'.format(mask_img.shape, shadow_img.shape, light_img.shape))
         mask_img, shadow_img, light_img = self.to_tensor(mask_img), self.to_tensor(shadow_img),self.to_tensor(light_img)
         
         return mask_img, light_img, shadow_img
@@ -145,9 +139,6 @@ class SSN_Dataset(Dataset):
         basename = os.path.basename(path)
         return os.path.join(folder, basename[:basename.find('_')])
     
-    def check_light(self, light_img):
-        return np.max(light_img) != 0.0
-    
     def statistics(self, key):
         self.stats_keys[key] += 1
 
@@ -156,12 +147,19 @@ class SSN_Dataset(Dataset):
     
     def render_new_shadow(self, shadow_bases):
         h, w, iw, ih = shadow_bases.shape
+        # is_bias = random.random() < 0.5
+        # if is_bias:
+        #     low, high = 0, 6
+        # else:
+        #     low, high = 0, 50
 
         num = random.randint(0, 50)
-        pattern_img = self.random_pattern_generator.get_pattern(num=num)
-        pattern_img = resize(pattern_img, (ih, iw))
+        pattern_img = self.random_pattern_generator.get_pattern(num=num, size=0.1, mitsuba=False)
+        
+        # flip to mitsuba ibl
+        pattern_img = cv2.flip(cv2.resize(pattern_img, (iw, ih)), 0)
         shadow = np.tensordot(shadow_bases, pattern_img, axes=([2,3], [1,0]))
-        pattern_img = np.expand_dims(resize(pattern_img, (16,32)), 2)
+        pattern_img = np.expand_dims(cv2.resize(pattern_img, (32,16)), 2)
 
         return np.expand_dims(shadow, 2), pattern_img
     
