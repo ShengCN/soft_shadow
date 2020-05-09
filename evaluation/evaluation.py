@@ -13,13 +13,15 @@ import torch
 import numpy as np
 import cv2
 import matplotlib.pyplot as plt
+import subprocess
+import imageio
 
 parser = argparse.ArgumentParser(description='evaluatoin pipeline')
 parser.add_argument('-f', '--file', type=str, help='input model file')
 parser.add_argument('-m', '--mask', type=str, help='mask file')
 parser.add_argument('-i', '--ibl', type=str, help='ibl file')
 parser.add_argument('-o', '--output', type=str, help='output folder')
-parser.add_argument('-w', '--weight', type=str, help='weight of current model', default='../weights/new_pattern_07-May-06-05-PM.pt')
+parser.add_argument('-w', '--weight', type=str, help='weight of current model', default='../weights/new_pattern_08-May-04-57-AM.pt')
 parser.add_argument('-v', '--verbose', action='store_true', help='output file name')
 
 options = parser.parse_args()
@@ -50,7 +52,7 @@ def parse_cam_world_str(lines):
         world += w + ' '
     return cam, world
 
-def parse_camera_world(update=True):
+def parse_camera_world(update=False):
     cam_world_file = './cam_world_dict.pkl'
     cam_world_dict = dict()
     if not update and os.path.exists(cam_world_file):
@@ -59,7 +61,7 @@ def parse_camera_world(update=True):
     else:
         cam_world_folder = '/home/ysheng/Dataset/mts_params/'
         folders = [join(cam_world_folder, f) for f in os.listdir(cam_world_folder) if os.path.isdir(join(cam_world_folder, f))]
-        print('there are {} folders'.format(len(folders)))
+        # print('there are {} folders'.format(len(folders)))
         for f in folders:
             basename = os.path.basename(f)
             if basename not in cam_world_dict.keys():
@@ -71,6 +73,7 @@ def parse_camera_world(update=True):
                 with open(cam_world) as f:
                     for l in f:
                         lines.append(l.rstrip('\n'))
+
                 fname = os.path.splitext(os.path.basename(cam_world))[0]
                 cam_world_dict[basename][fname] = parse_cam_world_str(lines)
         
@@ -83,49 +86,84 @@ def to_net_ibl(ibl_file):
     """ input:  32 x 16
         output: 32 x 5
     """
-    ibl = cv2.imread(ibl_file) / 255.0
-    return ibl[:5,:,0]
+    def normalize_energy(ibl, energy=3500):
+        sum_ibl = np.sum(ibl)
+        return ibl * energy / sum_ibl
 
-mts_final_xml,mts_shadow_xml = 'mts_final.xml', 'mts_shadow.xml'
-def mitsuba_render(model_file, ibl_file, final_out_file, shadow_out_file, real_ibl=True):
+    ibl = imageio.imread(ibl_file)
+    if len(ibl.shape) == 3:
+        ibl = ibl[:5,:,0] + ibl[:5,:,1] + ibl[:5,:,2]
+    else:
+        ibl = ibl[:5, :]
+    return normalize_energy(ibl)
+
+model_root = '/home/ysheng/Dataset/models'
+mts_final_xml,mts_shadow_xml = '/home/ysheng/Documents/adobe_shadow_net/evaluation/mts_final.xml', '/home/ysheng/Documents/adobe_shadow_net/evaluation/mts_shadow.xml'
+def mitsuba_render(mask_file, ibl_file, final_out_file, shadow_out_file, real_ibl=True, write_cmd=False):
     """ Input: mitsuba rendering related resources
         Output: rendered_gt, saved shadow image 
     """
     final_out_folder, shadow_out_folder = os.path.dirname(final_out_file), os.path.dirname(shadow_out_file)
+    cam_world_dict = parse_camera_world(False)
+
     # parse camera parameters, human matrix
-    cam_world_dict = parse_camera_world()
-    model_name = os.path.splitext(os.path.basename(model_file))[0]
-    model_cam_world_dict = cam_world_dict.get(model_name)
-    cam, world = model_cam_world_dict[list(model_cam_world_dict.keys())[0]]
+    # model_name = os.path.splitext(os.path.basename(model_file))[0]
+    # model_cam_world_dict = cam_world_dict.get(model_name)
+    # cam, world = model_cam_world_dict[list(model_cam_world_dict.keys())[0]]
+    model_name, mask_name = os.path.basename(os.path.dirname(mask_file)), os.path.splitext(os.path.basename(mask_file))[0]
+    cam, world = cam_world_dict[model_name][mask_name]
+    model_file = join(model_root, join(model_name, model_name + '.obj'))
 
     # ground plane model path
     ground_path = '"/home/ysheng/Dataset/models/ground/ground.obj'
 
     samples = 256
     # prepare an xml into this folder that has parameter for model file and ibl file, output_file
-    shadow_cmd = 'mitsuba {} -Dw=256 -Dh=256 -Dsamples={} -Dori=\"{}\" -Dtarget=\"{}\" -Dup=\"{}\" -Dibl=\"{}\" -Dground={}\" -Dmodel=\"{}\" -Dworld=\"{}\" -o \"{}\"'.format(
-        mts_shadow_xml, samples, cam[0], cam[1], cam[2], ibl_file, ground_path, model_file, world, shadow_out_file)
+    mitsuba_bash = '/home/ysheng/Documents/mitsuba/dist/mitsuba'
+    shadow_cmd = '\"{}\" {} -Dw=256 -Dh=256 -Dsamples={} -q -Dori=\"{}\" -Dtarget=\"{}\" -Dup=\"{}\" -Dibl=\"{}\" -Dground={}\" -Dmodel=\"{}\" -Dworld=\"{}\" -o \"{}\"'.format(
+        mitsuba_bash, mts_shadow_xml, samples, cam[0], cam[1], cam[2], ibl_file, ground_path, model_file, world, shadow_out_file)
 
-    final_cmd = 'mitsuba {} -Dw=256 -Dh=256 -Dsamples={} -Dori=\"{}\" -Dtarget=\"{}\" -Dup=\"{}\" -Dibl=\"{}\" -Dground={}\" -Dmodel=\"{}\" -Dworld=\"{}\" -o \"{}\"'.format(
-        mts_final_xml, samples, cam[0], cam[1], cam[2], ibl_file, ground_path, model_file, world, final_out_file)
+    final_cmd = '\"{}\" {} -Dw=256 -Dh=256 -Dsamples={} -q -Dori=\"{}\" -Dtarget=\"{}\" -Dup=\"{}\" -Dibl=\"{}\" -Dground={}\" -Dmodel=\"{}\" -Dworld=\"{}\" -o \"{}\"'.format(
+        mitsuba_bash, mts_final_xml, samples, cam[0], cam[1], cam[2], ibl_file, ground_path, model_file, world, final_out_file)
     
     # with open('test.txt','w+') as f:
     #     f.write(shadow_cmd)
     #     f.write('\n')
     #     f.write(final_cmd)
 
-    os.system(shadow_cmd)
-    mts_util_tonemapping_cmd = 'mtsutil tonemap {}'.format(shadow_out_file)
-    os.system(mts_util_tonemapping_cmd)
-
-    os.system(final_cmd)
+    mitsuba_util_bash = '/home/ysheng/Documents/mitsuba/dist/mtsutil'
+    shadow_tonemapping_cmd = '{} tonemap {}'.format(mitsuba_util_bash,shadow_out_file)
     if real_ibl:
         tone_scale = 5.0
     else:
-        tone_scale = 80
-    mts_util_tonemapping_cmd = 'mtsutil tonemap -m {} {}'.format(tone_scale, final_out_file)
-    os.system(mts_util_tonemapping_cmd)
+        tone_scale = 80000
+    final_tonemapping_cmd = '{} tonemap -m {} {}'.format(mitsuba_util_bash, tone_scale, final_out_file)
 
+    if write_cmd:
+        with open('mitsuba_bash.sh', 'a+') as f:
+            f.write('{}\n{}\n{}\n{}\n'.format(shadow_cmd, final_cmd, shadow_tonemapping_cmd, final_tonemapping_cmd))
+    else:
+        # os.system(shadow_cmd)
+        return_code = subprocess.check_output(shadow_cmd, shell=True) 
+        if options.verbose:
+            print(return_code) 
+
+        # os.system(mts_util_tonemapping_cmd)
+        return_code = subprocess.check_output(shadow_tonemapping_cmd, shell=True) 
+        if options.verbose:
+            print(return_code) 
+
+        # os.system(final_cmd)
+        return_code = subprocess.check_output(final_cmd, shell=True) 
+        if options.verbose:
+            print(return_code) 
+
+
+        # os.system(mts_util_tonemapping_cmd)
+        return_code = subprocess.check_output(final_tonemapping_cmd, shell=True) 
+        if options.verbose:
+            print(return_code) 
+        print('mitsuba finshed')
 
 def net_gt(mask_file, ibl_file, out_file):
     # given mask, get bases
@@ -150,7 +188,8 @@ def net_gt(mask_file, ibl_file, out_file):
 
     # save
     np.save(out_file, shadow)
-    print('net gt finish')
+    if options.verbose:
+        print('net gt finish')
     dirname, fname = os.path.dirname(out_file), os.path.splitext(os.path.basename(out_file))[0]
     png_output = os.path.join(dirname, fname + '.png')
     cv2.normalize(shadow, shadow, 0.0, 1.0, cv2.NORM_MINMAX)
@@ -172,13 +211,14 @@ def net_render(mask_file, ibl_file, out_file):
     png_output = os.path.join(dirname, fname + '.png')
     cv2.normalize(shadow_predict, shadow_predict, 0.0, 1.0, cv2.NORM_MINMAX)
     plt.imsave(png_output, shadow_predict, cmap='gray')
-
-    print('net predict {} finished, time: {}s'.format(out_file, time.time() -s))
+    
+    if options.verbose:
+        print('net predict {} finished, time: {}s'.format(out_file, time.time() -s))
 
 def merge_result(rendered_img, mask_file, shadow_img, out_file):
     pass
 
-def evaluate(model_file, mask_file, ibl_file, output, real_ibl=True):
+def evaluate(mask_file, ibl_file, output, real_ibl=True):
     """ output/mitsuba_final.png
         output/mitsuba_shadow.png
         output/mitsuba_merge.png
@@ -192,9 +232,11 @@ def evaluate(model_file, mask_file, ibl_file, output, real_ibl=True):
     net_gt_output, net_gt_merge = join(output, 'net_gt_shadow.npy'), join(output, 'net_gt_merge.npy')
 
     # call mitsuba render 
-    # mitsuba_render(model_file, ibl_file, mitsuba_final, mitsuba_shadow_output, real_ibl)
+    mitsuba_render(mask_file, ibl_file, mitsuba_final, mitsuba_shadow_output, real_ibl)
 
     # call net render result
+    dirname, fname = os.path.dirname(mask_file), os.path.splitext(os.path.basename(mask_file))[0]
+    mask_file = join(dirname, fname + ".npy")
     net_render(mask_file, ibl_file, net_shadow_output)
     net_gt(mask_file, ibl_file, net_gt_output)
     
@@ -211,4 +253,9 @@ if __name__ == '__main__':
     output = 'dbg/'
     os.makedirs(output, exist_ok=True)
     ibl_file = '../test_pattern.png'
-    evaluate(model_file, mask_file, ibl_file, output, False)
+
+    # model_file = '/home/ysheng/Dataset/models/simulated_combine_female_short_outfits_audrey_blair_summertimefull_Base_Pose_Standing_A/simulated_combine_female_short_outfits_audrey_blair_summertimefull_Base_Pose_Standing_A.obj'
+    mask_file = '/home/ysheng/Dataset/new_dataset/cache/mask/simulated_combine_female_short_outfits_audrey_blair_summertimefull_Base_Pose_Standing_A/pitch_35_rot_0_mask.npy'
+    ibl_file = '/home/ysheng/Dataset/ibls/pattern/num_6_size_0.08_ibl.png'
+    output = '/home/ysheng/Dataset/evaluation/simulated_combine_female_short_outfits_audrey_blair_summertimefull_Base_Pose_Standing_A/num_6_size_0.08_ibl'
+    evaluate(mask_file, ibl_file, output, False)

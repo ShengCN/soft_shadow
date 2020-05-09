@@ -20,8 +20,12 @@ class random_pattern():
         # y = []
         pass
 
-    def get_pattern(self, num=50, scale=3.0, size=0.1, energy=3500, mitsuba=False):
-        seed = random.randint(0,19920208)
+    def get_pattern(self, num=50, scale=3.0, size=0.1, energy=3500, mitsuba=False, seed=None):
+        if seed is None:
+            seed = random.randint(0,19920208)
+        else:
+            seed = seed + int(time.time())
+
         if num == 0:
             return np.zeros((80,512))
 
@@ -59,7 +63,7 @@ class random_pattern():
         if total_energy < 1e-3:
             print('small energy: ', total_energy)
             return np.zeros((80,512))
-            
+
         ibl = ibl * energy / total_energy
 
         return ibl

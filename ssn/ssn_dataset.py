@@ -89,6 +89,7 @@ class SSN_Dataset(Dataset):
         
         self.thread_id = os.getpid()
         self.need_log = parameter.log
+        self.seed = os.getpid()
 
     def __len__(self):
         if self.is_training:
@@ -154,7 +155,7 @@ class SSN_Dataset(Dataset):
         #     low, high = 0, 50
 
         num = random.randint(0, 50)
-        pattern_img = self.random_pattern_generator.get_pattern(num=num, size=0.1, mitsuba=False)
+        pattern_img = self.random_pattern_generator.get_pattern(num=num, size=0.1, mitsuba=False, seed=self.seed)
         
         # flip to mitsuba ibl
         pattern_img = cv2.flip(cv2.resize(pattern_img, (iw, ih)), 0)
