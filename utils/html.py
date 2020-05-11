@@ -3,7 +3,7 @@ from dominate.tags import meta, h3, table, tr, td, p, a, img, br
 import os
 
 class HTML:
-    def __init__(self, web_dir, title,reflesh=0):
+    def __init__(self, web_dir, title, reflesh=0):
         self.title = title
         self.web_dir = web_dir
         if not os.path.exists(self.web_dir):

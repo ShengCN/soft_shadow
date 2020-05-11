@@ -15,13 +15,14 @@ import cv2
 import matplotlib.pyplot as plt
 import subprocess
 import imageio
+import shutil 
 
 parser = argparse.ArgumentParser(description='evaluatoin pipeline')
 parser.add_argument('-f', '--file', type=str, help='input model file')
 parser.add_argument('-m', '--mask', type=str, help='mask file')
 parser.add_argument('-i', '--ibl', type=str, help='ibl file')
 parser.add_argument('-o', '--output', type=str, help='output folder')
-parser.add_argument('-w', '--weight', type=str, help='weight of current model', default='../weights/new_pattern_08-May-04-57-AM.pt')
+parser.add_argument('-w', '--weight', type=str, help='weight of current model', default='../weights/new_pattern_09-May-12-07-AM.pt')
 parser.add_argument('-v', '--verbose', action='store_true', help='output file name')
 
 options = parser.parse_args()
@@ -88,9 +89,14 @@ def to_net_ibl(ibl_file):
     """
     def normalize_energy(ibl, energy=3500):
         sum_ibl = np.sum(ibl)
+        if sum_ibl < 1e-3:
+            return ibl * 0.0
         return ibl * energy / sum_ibl
 
     ibl = imageio.imread(ibl_file)
+    if np.uint8 == ibl.dtype:
+       ibl = ibl / 255.0
+
     if len(ibl.shape) == 3:
         ibl = ibl[:5,:,0] + ibl[:5,:,1] + ibl[:5,:,2]
     else:
@@ -99,7 +105,7 @@ def to_net_ibl(ibl_file):
 
 model_root = '/home/ysheng/Dataset/models'
 mts_final_xml,mts_shadow_xml = '/home/ysheng/Documents/adobe_shadow_net/evaluation/mts_final.xml', '/home/ysheng/Documents/adobe_shadow_net/evaluation/mts_shadow.xml'
-def mitsuba_render(mask_file, ibl_file, final_out_file, shadow_out_file, real_ibl=True, write_cmd=False):
+def mitsuba_render(mask_file, ibl_file, final_out_file, shadow_out_file, real_ibl=True, write_cmd=False, skip=True):
     """ Input: mitsuba rendering related resources
         Output: rendered_gt, saved shadow image 
     """
@@ -112,19 +118,27 @@ def mitsuba_render(mask_file, ibl_file, final_out_file, shadow_out_file, real_ib
     # cam, world = model_cam_world_dict[list(model_cam_world_dict.keys())[0]]
     model_name, mask_name = os.path.basename(os.path.dirname(mask_file)), os.path.splitext(os.path.basename(mask_file))[0]
     cam, world = cam_world_dict[model_name][mask_name]
-    model_file = join(model_root, join(model_name, model_name + '.obj'))
+    model_file = join(model_root, model_name + '.obj')
 
     # ground plane model path
-    ground_path = '"/home/ysheng/Dataset/models/ground/ground.obj'
+    ground_path = '"/home/ysheng/Dataset/ori_models/ground/ground.obj'
 
     samples = 256
     # prepare an xml into this folder that has parameter for model file and ibl file, output_file
     mitsuba_bash = '/home/ysheng/Documents/mitsuba/dist/mitsuba'
-    shadow_cmd = '\"{}\" {} -Dw=256 -Dh=256 -Dsamples={} -q -Dori=\"{}\" -Dtarget=\"{}\" -Dup=\"{}\" -Dibl=\"{}\" -Dground={}\" -Dmodel=\"{}\" -Dworld=\"{}\" -o \"{}\"'.format(
+
+    if skip:
+        shadow_cmd = '\"{}\" {} -Dw=256 -Dh=256 -Dsamples={} -q -Dori=\"{}\" -Dtarget=\"{}\" -Dup=\"{}\" -Dibl=\"{}\" -Dground={}\" -Dmodel=\"{}\" -Dworld=\"{}\" -x -o \"{}\"'.format(
         mitsuba_bash, mts_shadow_xml, samples, cam[0], cam[1], cam[2], ibl_file, ground_path, model_file, world, shadow_out_file)
 
-    final_cmd = '\"{}\" {} -Dw=256 -Dh=256 -Dsamples={} -q -Dori=\"{}\" -Dtarget=\"{}\" -Dup=\"{}\" -Dibl=\"{}\" -Dground={}\" -Dmodel=\"{}\" -Dworld=\"{}\" -o \"{}\"'.format(
+        final_cmd = '\"{}\" {} -Dw=256 -Dh=256 -Dsamples={} -q -Dori=\"{}\" -Dtarget=\"{}\" -Dup=\"{}\" -Dibl=\"{}\" -Dground={}\" -Dmodel=\"{}\" -Dworld=\"{}\" -x -o \"{}\"'.format(
         mitsuba_bash, mts_final_xml, samples, cam[0], cam[1], cam[2], ibl_file, ground_path, model_file, world, final_out_file)
+    else:
+        shadow_cmd = '\"{}\" {} -Dw=256 -Dh=256 -Dsamples={} -q -Dori=\"{}\" -Dtarget=\"{}\" -Dup=\"{}\" -Dibl=\"{}\" -Dground={}\" -Dmodel=\"{}\" -Dworld=\"{}\" -o \"{}\"'.format(
+            mitsuba_bash, mts_shadow_xml, samples, cam[0], cam[1], cam[2], ibl_file, ground_path, model_file, world, shadow_out_file)
+
+        final_cmd = '\"{}\" {} -Dw=256 -Dh=256 -Dsamples={} -q -Dori=\"{}\" -Dtarget=\"{}\" -Dup=\"{}\" -Dibl=\"{}\" -Dground={}\" -Dmodel=\"{}\" -Dworld=\"{}\" -o \"{}\"'.format(
+            mitsuba_bash, mts_final_xml, samples, cam[0], cam[1], cam[2], ibl_file, ground_path, model_file, world, final_out_file)
     
     # with open('test.txt','w+') as f:
     #     f.write(shadow_cmd)
@@ -178,10 +192,21 @@ def net_gt(mask_file, ibl_file, out_file):
     shadow_bases = np.load(shadow_base_file)
     h, w, iw, ih = shadow_bases.shape
     
+    out_dir = os.path.dirname(out_file)
+    ibl_fname = os.path.splitext(os.path.basename(ibl_file))[0]
+    
+    # shutil.copyfile(ibl_file, join(out_dir, ibl_fname))
+    # cur_ibl = imageio.imread(ibl_file)
+
+    # do we need to normalize? 
+    # imageio.imwrite(join(out_dir, ibl_fname + '_ori' + ".png"), cur_ibl)
+
     # remember, this ibl should always be 80 x 512
     # ibl = np.load(ibl_file)
-    ibl = to_net_ibl(ibl_file)
+    ibl = to_net_ibl(ibl_file)    
     ibl = cv2.flip(ibl, 0)
+    cur_ibl = cv2.resize(ibl, (256, 40))
+    imageio.imwrite(join(out_dir, "ibl.png"), ibl)
 
     # ibl = cv2.resize(ibl, (iw, ih), interpolation=cv2.INTER_NEAREST)
     shadow = np.tensordot(shadow_bases, ibl, axes=([2,3], [1,0]))
@@ -255,7 +280,7 @@ if __name__ == '__main__':
     ibl_file = '../test_pattern.png'
 
     # model_file = '/home/ysheng/Dataset/models/simulated_combine_female_short_outfits_audrey_blair_summertimefull_Base_Pose_Standing_A/simulated_combine_female_short_outfits_audrey_blair_summertimefull_Base_Pose_Standing_A.obj'
-    mask_file = '/home/ysheng/Dataset/new_dataset/cache/mask/simulated_combine_female_short_outfits_audrey_blair_summertimefull_Base_Pose_Standing_A/pitch_35_rot_0_mask.npy'
+    mask_file = '/home/ysheng/Dataset/new_dataset/cache/mask/simulated_combine_female_long_fullbody_bridget8_wildwind_ssradclosedrobe_CDIG8Female_StandH/pitch_35_rot_0_mask.npy'
     ibl_file = '/home/ysheng/Dataset/ibls/pattern/num_6_size_0.08_ibl.png'
     output = '/home/ysheng/Dataset/evaluation/simulated_combine_female_short_outfits_audrey_blair_summertimefull_Base_Pose_Standing_A/num_6_size_0.08_ibl'
     evaluate(mask_file, ibl_file, output, False)

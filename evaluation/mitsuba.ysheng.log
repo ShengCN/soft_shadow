@@ -1,21 +1,4 @@
-2020-05-09 02:16:40 INFO  main [mitsuba.cpp:275] Mitsuba version 0.6.0 (Linux, 64 bit), Copyright (c) 2017 Wenzel Jakob
-2020-05-09 02:16:40 INFO  main [mitsuba.cpp:377] Parsing scene description from "/home/ysheng/Documents/adobe_shadow_net/evaluation/mts_final.xml" ..
-2020-05-09 02:16:40 INFO  main [PluginManager] Loading plugin "plugins/path.so" ..
-2020-05-09 02:16:40 INFO  main [PluginManager] Loading plugin "plugins/ldsampler.so" ..
-2020-05-09 02:16:40 INFO  main [PluginManager] Loading plugin "plugins/gaussian.so" ..
-2020-05-09 02:16:40 INFO  main [PluginManager] Loading plugin "plugins/hdrfilm.so" ..
-2020-05-09 02:16:40 INFO  main [PluginManager] Loading plugin "plugins/perspective.so" ..
-2020-05-09 02:16:40 INFO  main [PluginManager] Loading plugin "plugins/envmap.so" ..
-2020-05-09 02:16:40 INFO  main [EnvironmentMap] Loading environment map "num_17_size_0.01_ibl.png"
-2020-05-09 02:16:40 INFO  main [PluginManager] Loading plugin "plugins/lanczos.so" ..
-2020-05-09 02:16:40 INFO  main [EnvironmentMap] Precomputing data structures for environment map sampling (2.2 KiB)
-2020-05-09 02:16:40 INFO  main [EnvironmentMap] Done (took 0 ms)
-2020-05-09 02:16:40 INFO  main [PluginManager] Loading plugin "plugins/diffuse.so" ..
-2020-05-09 02:16:40 INFO  main [PluginManager] Loading plugin "plugins/twosided.so" ..
-2020-05-09 02:16:40 INFO  main [PluginManager] Loading plugin "plugins/dielectric.so" ..
-2020-05-09 02:16:40 INFO  main [PluginManager] Loading plugin "plugins/obj.so" ..
-2020-05-09 02:16:40 INFO  main [WavefrontOBJ] Loading geometry from "ground.obj" ..
-2020-05-09 02:16:40 INFO  main [WavefrontOBJ] pPlane1: 200 triangles, 121 vertices (merged 479 vertices).
-2020-05-09 02:16:40 INFO  main [WavefrontOBJ] Loading OBJ materials from "ground.mtl" ..
-2020-05-09 02:16:40 INFO  main [WavefrontOBJ] Done with "ground.obj" (took 0 ms)
-2020-05-09 02:16:40 INFO  main [WavefrontOBJ] Loading geometry from "notsimulated_combine_male_short_outfits_genesis8_blair_casualoutfit01_Base_Pose_Standing_C.obj" ..
+2020-05-11 07:09:49 INFO  main [mtsutil.cpp:232] Mitsuba version 0.6.0 (Linux, 64 bit), Copyright (c) 2017 Wenzel Jakob
+2020-05-11 07:09:49 INFO  main [mtsutil.cpp:366] Loading utility "tonemap" ..
+2020-05-11 07:09:49 INFO  main [Tonemap] Loading image "/home/ysheng/Dataset/evaluation/simulated_combine_female_short_outfits_audrey_blair_summertimefull_CDIG8Female_StandH/real/20050806-03_hd/mitsuba_final.exr" ..
+2020-05-11 07:09:49 INFO  main [Tonemap] Writing tonemapped image to "/home/ysheng/Dataset/evaluation/simulated_combine_female_short_outfits_audrey_blair_summertimefull_CDIG8Female_StandH/real/20050806-03_hd/mitsuba_final.png" ..
