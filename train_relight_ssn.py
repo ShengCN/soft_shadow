@@ -240,7 +240,6 @@ def train(params):
             global_params = options().get_params()
             save_model("weights", model, optimizer, epoch, best_valid_loss, exp_name, hist_train_loss, hist_valid_loss, global_params)
 
-
     print("Training finished")
 
 if __name__ == "__main__":    

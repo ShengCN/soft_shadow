@@ -22,7 +22,7 @@ parser.add_argument('-f', '--file', type=str, help='input model file')
 parser.add_argument('-m', '--mask', type=str, help='mask file')
 parser.add_argument('-i', '--ibl', type=str, help='ibl file')
 parser.add_argument('-o', '--output', type=str, help='output folder')
-parser.add_argument('-w', '--weight', type=str, help='weight of current model', default='../weights/new_pattern_09-May-12-07-AM.pt')
+parser.add_argument('-w', '--weight', type=str, help='weight of current model', default='../weights/new_pattern_11-May-09-59-PM.pt')
 parser.add_argument('-v', '--verbose', action='store_true', help='output file name')
 
 options = parser.parse_args()
@@ -83,11 +83,18 @@ def parse_camera_world(update=False):
 
     return cam_world_dict
 
+def composite_shadow(mask_np, mitsuba_final_np, mitsuba_shadow_np):
+    masked_area = np.where(mask_np > 1e-3)
+    
+    ret = np.copy(mitsuba_shadow_np)
+    ret[masked_area] = mitsuba_final_np[masked_area]
+    return ret
+
 def to_net_ibl(ibl_file):
     """ input:  32 x 16
         output: 32 x 5
     """
-    def normalize_energy(ibl, energy=3500):
+    def normalize_energy(ibl, energy=30):
         sum_ibl = np.sum(ibl)
         if sum_ibl < 1e-3:
             return ibl * 0.0
@@ -101,6 +108,8 @@ def to_net_ibl(ibl_file):
         ibl = ibl[:5,:,0] + ibl[:5,:,1] + ibl[:5,:,2]
     else:
         ibl = ibl[:5, :]
+    
+    # return ibl
     return normalize_energy(ibl)
 
 model_root = '/home/ysheng/Dataset/models'
@@ -150,7 +159,11 @@ def mitsuba_render(mask_file, ibl_file, final_out_file, shadow_out_file, real_ib
     if real_ibl:
         tone_scale = 5.0
     else:
-        tone_scale = 80000
+        ibl_np = imageio.imread(ibl_file)
+        if ibl_np.dtype == np.uint8:
+            ibl_np = ibl_np/255.0
+
+        tone_scale = 465 * np.sum(ibl_np)
     final_tonemapping_cmd = '{} tonemap -m {} {}'.format(mitsuba_util_bash, tone_scale, final_out_file)
 
     if write_cmd:
@@ -195,18 +208,14 @@ def net_gt(mask_file, ibl_file, out_file):
     out_dir = os.path.dirname(out_file)
     ibl_fname = os.path.splitext(os.path.basename(ibl_file))[0]
     
-    # shutil.copyfile(ibl_file, join(out_dir, ibl_fname))
-    # cur_ibl = imageio.imread(ibl_file)
-
-    # do we need to normalize? 
-    # imageio.imwrite(join(out_dir, ibl_fname + '_ori' + ".png"), cur_ibl)
-
     # remember, this ibl should always be 80 x 512
     # ibl = np.load(ibl_file)
     ibl = to_net_ibl(ibl_file)    
+    save_ibl = np.copy(ibl)
+    cv2.normalize(ibl, save_ibl, 0.0, 1.0, cv2.NORM_MINMAX)
+    plt.imsave(join(out_dir, "ibl.png"), save_ibl, cmap='gray')
+
     ibl = cv2.flip(ibl, 0)
-    cur_ibl = cv2.resize(ibl, (256, 40))
-    imageio.imwrite(join(out_dir, "ibl.png"), ibl)
 
     # ibl = cv2.resize(ibl, (iw, ih), interpolation=cv2.INTER_NEAREST)
     shadow = np.tensordot(shadow_bases, ibl, axes=([2,3], [1,0]))
@@ -220,10 +229,22 @@ def net_gt(mask_file, ibl_file, out_file):
     cv2.normalize(shadow, shadow, 0.0, 1.0, cv2.NORM_MINMAX)
     plt.imsave(png_output, shadow, cmap='gray')
 
+    return shadow
+
 def net_render(mask_file, ibl_file, out_file):
     s = time.time()
-    ibl = cv2.flip(to_net_ibl(ibl_file), 0)
-    mask, ibl = to_tensor(np.expand_dims(np.load(mask_file), axis=2)), to_tensor(np.expand_dims(cv2.resize(ibl, (32,16), interpolation=cv2.INTER_NEAREST), axis=2))
+    net_ibl = to_net_ibl(ibl_file)
+    if net_ibl.shape[0] != 5 and net_ibl.shape[1] != 32:
+        print('net render ibl is wrong, please check: ', net_ibl.shape)
+        return None
+
+    ibl = cv2.flip(net_ibl, 0)
+    mask_np = imageio.imread(mask_file)
+    mask_np = mask_np[:,:,0]
+    if mask_np.dtype == np.uint8:
+        mask_np = mask_np/255.0
+
+    mask, ibl = to_tensor(np.expand_dims(mask_np, axis=2)), to_tensor(np.expand_dims(cv2.resize(ibl, (32,16), interpolation=cv2.INTER_NEAREST), axis=2))
     with torch.no_grad():
         I_s, L_t = torch.unsqueeze(mask.to(device),0), torch.unsqueeze(ibl.to(device),0)
 
@@ -239,6 +260,8 @@ def net_render(mask_file, ibl_file, out_file):
     
     if options.verbose:
         print('net predict {} finished, time: {}s'.format(out_file, time.time() -s))
+    
+    return shadow_predict
 
 def merge_result(rendered_img, mask_file, shadow_img, out_file):
     pass

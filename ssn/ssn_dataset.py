@@ -112,7 +112,8 @@ class SSN_Dataset(Dataset):
         if idx % 10 == 0 and self.thread_id == os.getpid() and self.need_log:
             is_log = True
         
-        random.seed(idx * 1234 + os.getpid() + time.time())
+        cur_seed = idx * 1234 + os.getpid() + time.time()
+        random.seed(cur_seed)
         # random ibls
         if is_log:
             s = time.time()
@@ -124,7 +125,7 @@ class SSN_Dataset(Dataset):
 
         if is_log:
             s = time.time()  
-        shadow_img, light_img = self.render_new_shadow(shadow_bases)
+        shadow_img, light_img = self.render_new_shadow(shadow_bases, cur_seed)
         if is_log:
             elapsed = time.time() - s
             log_info += '{} rendering file time: {} \n'.format(idx, elapsed)
@@ -146,19 +147,18 @@ class SSN_Dataset(Dataset):
     def get_statistics(self):
         return self.stats_keys
     
-    def render_new_shadow(self, shadow_bases):
+    def render_new_shadow(self, shadow_bases, seed):
         h, w, iw, ih = shadow_bases.shape
         # is_bias = random.random() < 0.5
         # if is_bias:
         #     low, high = 0, 6
         # else:
         #     low, high = 0, 50
-
         num = random.randint(0, 50)
-        pattern_img = self.random_pattern_generator.get_pattern(num=num, size=0.1, mitsuba=False, seed=self.seed)
+        pattern_img = self.random_pattern_generator.get_pattern(num=num, size=0.1, mitsuba=False, seed=int(seed))
         
         # flip to mitsuba ibl
-        pattern_img = cv2.flip(cv2.resize(pattern_img, (iw, ih)), 0)
+        pattern_img = self.normalize_energy(cv2.flip(cv2.resize(pattern_img, (iw, ih)), 0))
         shadow = np.tensordot(shadow_bases, pattern_img, axes=([2,3], [1,0]))
         pattern_img = np.expand_dims(cv2.resize(pattern_img, (32,16)), 2)
 
@@ -170,3 +170,8 @@ class SSN_Dataset(Dataset):
     def log(self, log_info):
         with open('log.txt', 'a+') as f:
             f.write(log_info)
+
+    def normalize_energy(self, ibl, energy=30.0):
+        if np.sum(ibl) < 1e-3:
+            return ibl
+        return ibl * energy / np.sum(ibl)
