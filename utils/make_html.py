@@ -40,9 +40,11 @@ def eval_gen(webpage, output_folder, is_pattern=True):
             net_gt = join(cur_ibl_relative, 'gt.png')
             net_predict = join(cur_ibl_relative, 'predict.png')
             mitsuba_final = join(cur_ibl_relative, 'composite.png')
+            pred_final = join(cur_ibl_relative, 'composite_pred.png')
             
             # print(ibl_name)
-            ims, txts, links = [ibl,mitsuba_shadow, net_gt, net_predict, mitsuba_final], ['{}'.format(ibl_name),'mitsuba shadow', 'net GT', 'net predict', 'mitsuba final'], [ibl, mitsuba_shadow, net_gt, net_predict, mitsuba_final]
+            ims, txts, links = [ibl,mitsuba_shadow, net_gt, net_predict, mitsuba_final, pred_final], ['{}'.format(ibl_name),'mitsuba shadow', 'net GT', 'net predict', 'mitsuba final', 'pred final'],  [ibl, mitsuba_shadow, net_gt, net_predict, mitsuba_final, pred_final]
+
             webpage.add_images(ims, txts, links)
 
 vis_pattern_folder = '/home/ysheng/Documents/vis_pattern'

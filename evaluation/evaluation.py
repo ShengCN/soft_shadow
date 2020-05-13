@@ -28,8 +28,8 @@ parser.add_argument('-v', '--verbose', action='store_true', help='output file na
 options = parser.parse_args()
 print('options: ', options)
 
-device = torch.device("cpu")
-# device = torch.device("cuda:2" if torch.cuda.is_available() else "cpu")
+# device = torch.device("cpu")
+device = torch.device("cuda:2" if torch.cuda.is_available() else "cpu")
 print("Device: ", device)
 model = Relight_SSN(1,1)
 weight_file = options.weight
