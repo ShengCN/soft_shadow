@@ -5,18 +5,6 @@ import cv2
 import random
 from tqdm import tqdm
 
-# gs = ig.Composite(operator=np.add,
-#             generators=[ig.Gaussian(
-#                         size=size*ng.UniformRandom(seed=seed+i+4),
-#                         scale=scale*(ng.UniformRandom(seed=seed+i+5)+1e-3),
-#                         x=ng.UniformRandom(seed=seed+i+1)-0.5,
-#                         y=(ng.UniformRandom(seed=seed+i+2)-0.5)*factor,
-#                         aspect_ratio=0.7,
-#                         orientation=np.pi*ng.UniformRandom(seed=seed+i+3),
-#                         ) for i in range(num)],
-#                 position=(0, 0), 
-#                 xdensity=512)
-
 class base_ibl_animator(object):
     def __init__(self, num, size,verbose=True):
         random.seed(19920208)

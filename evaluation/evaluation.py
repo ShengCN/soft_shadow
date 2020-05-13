@@ -28,8 +28,8 @@ parser.add_argument('-v', '--verbose', action='store_true', help='output file na
 options = parser.parse_args()
 print('options: ', options)
 
-# device = torch.device("cpu")
-device = torch.device("cuda:2" if torch.cuda.is_available() else "cpu")
+device = torch.device("cpu")
+# device = torch.device("cuda:2" if torch.cuda.is_available() else "cpu")
 print("Device: ", device)
 model = Relight_SSN(1,1)
 weight_file = options.weight
@@ -113,13 +113,14 @@ def to_net_ibl(ibl_file):
     return normalize_energy(ibl)
 
 model_root = '/home/ysheng/Dataset/models'
+mitsuba_bash = '/home/ysheng/Documents/mitsuba/dist/mitsuba'
 mts_final_xml,mts_shadow_xml = '/home/ysheng/Documents/adobe_shadow_net/evaluation/mts_final.xml', '/home/ysheng/Documents/adobe_shadow_net/evaluation/mts_shadow.xml'
-def mitsuba_render(mask_file, ibl_file, final_out_file, shadow_out_file, real_ibl=True, write_cmd=False, skip=True):
+def mitsuba_render(mask_file, ibl_file, final_out_file, shadow_out_file, final=True, update_cam_param=False, real_ibl=True, write_cmd=False, skip=True, cmd_path='mitsuba_bash.sh'):
     """ Input: mitsuba rendering related resources
         Output: rendered_gt, saved shadow image 
     """
     final_out_folder, shadow_out_folder = os.path.dirname(final_out_file), os.path.dirname(shadow_out_file)
-    cam_world_dict = parse_camera_world(False)
+    cam_world_dict = parse_camera_world(update_cam_param)
 
     # parse camera parameters, human matrix
     # model_name = os.path.splitext(os.path.basename(model_file))[0]
@@ -134,7 +135,6 @@ def mitsuba_render(mask_file, ibl_file, final_out_file, shadow_out_file, real_ib
 
     samples = 256
     # prepare an xml into this folder that has parameter for model file and ibl file, output_file
-    mitsuba_bash = '/home/ysheng/Documents/mitsuba/dist/mitsuba'
 
     if skip:
         shadow_cmd = '\"{}\" {} -Dw=256 -Dh=256 -Dsamples={} -q -Dori=\"{}\" -Dtarget=\"{}\" -Dup=\"{}\" -Dibl=\"{}\" -Dground={}\" -Dmodel=\"{}\" -Dworld=\"{}\" -x -o \"{}\"'.format(
@@ -167,8 +167,11 @@ def mitsuba_render(mask_file, ibl_file, final_out_file, shadow_out_file, real_ib
     final_tonemapping_cmd = '{} tonemap -m {} {}'.format(mitsuba_util_bash, tone_scale, final_out_file)
 
     if write_cmd:
-        with open('mitsuba_bash.sh', 'a+') as f:
-            f.write('{}\n{}\n{}\n{}\n'.format(shadow_cmd, final_cmd, shadow_tonemapping_cmd, final_tonemapping_cmd))
+        with open(cmd_path, 'a+') as f:
+            if final:
+                f.write('{}\n{}\n{}\n{}\n'.format(shadow_cmd, final_cmd, shadow_tonemapping_cmd, final_tonemapping_cmd))
+            else:
+                f.write('{}\n{}\n'.format(shadow_cmd, shadow_tonemapping_cmd))
     else:
         # os.system(shadow_cmd)
         return_code = subprocess.check_output(shadow_cmd, shell=True) 
