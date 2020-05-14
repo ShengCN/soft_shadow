@@ -19,6 +19,8 @@ def get_layer_info(out_channels, activation_func='relu'):
             group_num = 1
             
         norm_layer = nn.GroupNorm(group_num, out_channels)
+    elif parameter.norm == 'None':
+        norm_layer = None
     else:
         raise Exception('norm name error')
     
@@ -41,11 +43,16 @@ class Conv(nn.Module):
         else:
             activation_func = 'relu'
         norm_layer, activation_func = get_layer_info(out_channels, activation_func)
-        self.conv = nn.Sequential(
-            nn.Conv2d(in_channels, out_channels,stride=conv_stride, kernel_size=3, padding=1, bias=True),
-            norm_layer,
-            activation_func)
-        
+        if norm_layer is not None:
+            self.conv = nn.Sequential(
+                nn.Conv2d(in_channels, out_channels,stride=conv_stride, kernel_size=3, padding=1, bias=True),
+                norm_layer,
+                activation_func)
+        else:
+            self.conv = nn.Sequential(
+                nn.Conv2d(in_channels, out_channels,stride=conv_stride, kernel_size=3, padding=1, bias=True),
+                activation_func)
+
     def forward(self, x):
         return self.conv(x)
 

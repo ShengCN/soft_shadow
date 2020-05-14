@@ -22,12 +22,18 @@ class Relight_SSN(nn.Module):
 
         # norm_layer, activation_func = get_layer_info(32 - n_channels)
         # norm_layer = nn.BatchNorm2d(32 - n_channels, momentum=0.9)
-        self.in_conv = nn.Sequential(
-            nn.Conv2d(n_channels, 32 - n_channels, kernel_size=7, padding=3, bias=True),
-            norm_layer,
-            activation_func
-        )
-        
+        if norm_layer is not None:
+            self.in_conv = nn.Sequential(
+                nn.Conv2d(n_channels, 32 - n_channels, kernel_size=7, padding=3, bias=True),
+                norm_layer,
+                activation_func
+            )
+        else:
+            self.in_conv = nn.Sequential(
+                nn.Conv2d(n_channels, 32 - n_channels, kernel_size=7, padding=3, bias=True),
+                activation_func
+            )
+
         self.down_256_128  = Conv(32, 64, 2)
         self.down_128_128  = Conv(64, 64, 1)
         self.down_128_64   = Conv(64, 128, 2)

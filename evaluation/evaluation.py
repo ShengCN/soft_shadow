@@ -28,8 +28,8 @@ parser.add_argument('-v', '--verbose', action='store_true', help='output file na
 options = parser.parse_args()
 print('options: ', options)
 
-device = torch.device("cpu")
-# device = torch.device("cuda:2" if torch.cuda.is_available() else "cpu")
+# device = torch.device("cpu")
+device = torch.device("cuda:2" if torch.cuda.is_available() else "cpu")
 print("Device: ", device)
 model = Relight_SSN(1,1)
 weight_file = options.weight
@@ -70,6 +70,9 @@ def parse_camera_world(update=False):
 
             cam_world_files = get_files(f)
             for cam_world in cam_world_files:
+                if cam_world.find('txt') == -1:
+                    continue
+
                 lines = []
                 with open(cam_world) as f:
                     for l in f:
@@ -234,7 +237,7 @@ def net_gt(mask_file, ibl_file, out_file):
 
     return shadow
 
-def net_render(mask_file, ibl_file, out_file):
+def net_render(mask_file, ibl_file, out_file, save_npy=True):
     s = time.time()
     net_ibl = to_net_ibl(ibl_file)
     if net_ibl.shape[0] != 5 and net_ibl.shape[1] != 32:
@@ -254,7 +257,8 @@ def net_render(mask_file, ibl_file, out_file):
         predicted_img, predicted_src_light = model(I_s, L_t)
 
     shadow_predict = np.squeeze(predicted_img[0].detach().cpu().numpy().transpose((1,2,0)))
-    np.save(out_file, shadow_predict)
+    if save_npy:
+        np.save(out_file, shadow_predict)
     
     dirname, fname = os.path.dirname(out_file), os.path.splitext(os.path.basename(out_file))[0]
     png_output = os.path.join(dirname, fname + '.png')

@@ -1,1 +1,1 @@
-CUDA_VISIBLE_DEVICES=0,1,2 python train_relight_ssn.py --exp_name='new_pattern_ibas' --multi_gpu --batch_size=76 --workers=76 --norm='batch_norm' --use_schedule --patience=10 --bilinear --lr=1e-3 --timers=10
+CUDA_VISIBLE_DEVICES=0,1,2 python train_relight_ssn.py --exp_name='group_norm' --multi_gpu --batch_size=64 --workers=76 --norm='group_norm' --use_schedule --patience=10 --bilinear --lr=1e-3 --timers=10

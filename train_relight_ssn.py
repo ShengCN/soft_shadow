@@ -15,6 +15,7 @@ from ssn.ssn import Relight_SSN
 from utils.net_utils import save_model, get_lr, set_lr
 from utils.visdom_utils import visdom_plot_loss, visdom_relight_results, visdom_log, visdom_show_batch, visdom_show_light
 from params import params as options, parse_params
+import matplotlib.pyplot as plt
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print("Device: ", device)
@@ -55,12 +56,20 @@ def reconstruct_loss(gt_img, pred_img):
 def get_grid_img(tensor_img):
     return utils.make_grid(tensor_img).detach().cpu().unsqueeze(0)
 
-def visdom_plot_img(I_t, predicted_img, mask, L_t, is_training=True):
+def visdom_plot_img(I_t, predicted_img, mask, L_t, is_training=True, save_batch=False):
     batch_size = min(I_t.shape[0], 4)
 
     vis_predicted_img = get_grid_img(predicted_img[:batch_size])
     vis_predicted_img_gt = get_grid_img(I_t[:batch_size])
     # import pdb; pdb.set_trace()
+
+    if save_batch:
+        vis_predicted_img_np = np.clip(vis_predicted_img[0].detach().cpu().numpy().transpose((1,2,0)), 0.0, 1.0)
+        vis_predicted_img_gt_np = np.clip(vis_predicted_img_gt[0].detach().cpu().numpy().transpose((1,2,0)), 0.0, 1.0)
+        saving_folder = 'training_result'
+        pred_fname, gt_fname = os.path.join(saving_folder, 'predict_{}.png'.format(datetime.datetime.now())), os.path.join(saving_folder,'gt_{}.png'.format(datetime.datetime.now()))
+        plt.imsave(pred_fname, vis_predicted_img_np, cmap='gray')
+        plt.imsave(gt_fname, vis_predicted_img_gt_np, cmap='gray')
 
     vis_shadow_img = torch.cat((vis_predicted_img_gt,
                                 vis_predicted_img))
@@ -106,7 +115,7 @@ def training_iteration(model, train_dataloder, optimizer, train_loss, epoch_num)
                     divide_factor = 1.0
                     visdom_plot_img(torch.clamp(I_t* divide_factor, 0.0, 1.0),
                                 torch.clamp(predicted_img * divide_factor, 0.0, 1.0),
-                                mask, L_t)
+                                mask, L_t, save_batch=False)
 
                 # keep tracking
                 train_loss.append(loss.item()/np.sqrt(params.batch_size))
@@ -209,7 +218,7 @@ def train(params):
 
     # training states
     train_loss, valid_loss = [], []
-
+    
     # training iterations
     for epoch in range(params.epochs):
         # training

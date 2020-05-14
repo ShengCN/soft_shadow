@@ -1,1 +1,1 @@
-CUDA_VISIBLE_DEVICES=0,1,2 python train_relight_ssn.py --exp_name='new_pattern' --batch_size=72 --multi_gpu --workers=72 --norm='batch_norm' --bilinear --resume --weight_file='new_pattern_12-May-09-20-AM.pt' --relearn --lr=5e-4 --timers=10 --patience=4
+CUDA_VISIBLE_DEVICES=0,1,2 python train_relight_ssn.py --exp_name='group_norm' --batch_size=64 --multi_gpu --workers=72 --norm='group_norm' --bilinear --resume --weight_file='group_norm_14-May-07-23-AM.pt' --relearn --lr=5e-4 --timers=10 --use_schedule --patience=4
