@@ -17,7 +17,8 @@ class params():
             self.new_ibl = False
             self.multi_gpu = False
             self.log = True
-            
+            self.coordconv = False
+
         def set_params(self, options):
             self.options = options
             self.norm = options.norm
@@ -31,7 +32,8 @@ class params():
             self.new_ibl = options.new_ibl
             self.multi_gpu = options.multi_gpu
             self.log = options.log
-            
+            self.coordconv = options.coordconv
+
         def __str__(self):
             return 'norm: {} bilinear: {} activation: {} prelu: {} ibl: {} weight decay: {} scale_ibl: {} small ds: {}'.format(self.norm, 
                                                                                                                                self.bilinear, 
@@ -81,7 +83,10 @@ def parse_params():
     parser.add_argument('--log', action='store_true', help='log information')
     parser.add_argument('--ibl_num', type=int, default=24, help='maximum ibl number during training')
     parser.add_argument('--weight_decay', type=float, default=4e-5, help='weight decay for model weight')
+    parser.add_argument('--save', action='store_true', help='save batch results?')
     
+    parser.add_argument('--coordconv', action='store_true', help='use coord convolution')
+
     # parser.add_argument('--cpu', action='store_true', help='Force training on CPU')
     arguments = parser.parse_args()
     parameter = params()

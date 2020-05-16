@@ -31,13 +31,60 @@ def get_layer_info(out_channels, activation_func='relu'):
         
     return norm_layer, activation_func
 
+# add coord_conv
+class add_coords(nn.Module):
+    def __init__(self, use_cuda=True):
+        super(add_coords, self).__init__()
+        self.use_cuda = use_cuda
+        
+    def forward(self, input_tensor):
+        b, c, dim_y, dim_x = input_tensor.shape
+        xx_ones = torch.ones([1, 1, 1, dim_x], dtype=torch.int32)
+        yy_ones = torch.ones([1, 1, 1, dim_y], dtype=torch.int32)
+
+        xx_range = torch.arange(dim_y, dtype=torch.int32)
+        yy_range = torch.arange(dim_x, dtype=torch.int32)
+        xx_range = xx_range[None, None, :, None]
+        yy_range = yy_range[None, None, :, None]
+
+        xx_channel = torch.matmul(xx_range, xx_ones)
+        yy_channel = torch.matmul(yy_range, yy_ones)
+
+        # transpose y
+        yy_channel = yy_channel.permute(0, 1, 3, 2)
+
+        xx_channel = xx_channel.float() / (dim_y - 1)
+        yy_channel = yy_channel.float() / (dim_x - 1)
+
+        xx_channel = xx_channel * 2 - 1
+        yy_channel = yy_channel * 2 - 1
+
+        xx_channel = xx_channel.repeat(b, 1, 1, 1)
+        yy_channel = yy_channel.repeat(b, 1, 1, 1)
+
+        if torch.cuda.is_available and self.use_cuda:
+            input_tensor = input_tensor.cuda()
+            xx_channel = xx_channel.cuda()
+            yy_channel = yy_channel.cuda()
+        out = torch.cat([input_tensor, xx_channel, yy_channel], dim=1)
+        return out
+
 class Conv(nn.Module):
     """ (convolution => [BN] => ReLU) """
     
-    def __init__(self, in_channels, out_channels, conv_stride, activation_func='relu'):
+    def __init__(self, in_channels, out_channels, kernel_size=3, conv_stride=1, padding=1, bias=True, activation_func='relu'):
         super().__init__()
         
         parameter = params().get_params()
+        if parameter.coordconv:
+            self.use_coordconv = True
+            self.add_coord = add_coords()
+        else:
+            self.use_coordconv = False
+
+        if parameter.coordconv:
+            in_channels = in_channels + 2
+        
         if parameter.prelu:
             activation_func = 'prelu'
         else:
@@ -45,15 +92,18 @@ class Conv(nn.Module):
         norm_layer, activation_func = get_layer_info(out_channels, activation_func)
         if norm_layer is not None:
             self.conv = nn.Sequential(
-                nn.Conv2d(in_channels, out_channels,stride=conv_stride, kernel_size=3, padding=1, bias=True),
+                nn.Conv2d(in_channels, out_channels,stride=conv_stride, kernel_size=kernel_size, padding=padding, bias=bias),
                 norm_layer,
                 activation_func)
         else:
             self.conv = nn.Sequential(
-                nn.Conv2d(in_channels, out_channels,stride=conv_stride, kernel_size=3, padding=1, bias=True),
+                nn.Conv2d(in_channels, out_channels,stride=conv_stride, kernel_size=kernel_size, padding=padding, bias=bias),
                 activation_func)
 
     def forward(self, x):
+        if self.use_coordconv:
+            x = self.add_coord(x)
+
         return self.conv(x)
 
 class Up(nn.Module):
@@ -74,20 +124,20 @@ class Up(nn.Module):
             self.up = nn.Sequential(
                 up_layer,
                 norm_layer,
-                activation_func)
+                activation_func=activation_func)
         else:
             up_layer = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
             if parameter.double_conv:
                 self.up = nn.Sequential(
                     up_layer,
-                    Conv(in_channels, in_channels//2, 1,activation_func),
-                    Conv(in_channels//2, out_channels, 1,activation_func),
+                    Conv(in_channels, in_channels//2,  activation_func=activation_func),
+                    Conv(in_channels//2, out_channels, activation_func= activation_func),
                     norm_layer,
                     activation_func)
             else:
                 self.up = nn.Sequential(
                     up_layer,
-                    Conv(in_channels, in_channels//4, 1, activation_func),
+                    Conv(in_channels, in_channels//4, activation_func= activation_func),
                     norm_layer,
                     activation_func)
 
@@ -109,27 +159,24 @@ class Up_Stream(nn.Module):
         self.ibl_num = parameter.ibl_num
         self.new_ibl = parameter.new_ibl
         
-        # input_channel = 512 * self.ibl_num
-        if not self.new_ibl:
-            input_channel = 512
-        else:
-            input_channel = 512 * 3
-            
-        self.up_16_16_1 = Conv(input_channel, 256, 1, activation_func)
-        self.up_16_16_2 = Conv(768, 512, 1, activation_func)
-        self.up_16_16_3 = Conv(1024, 512, 1, activation_func)
+        input_channel = 512
+        norm_layer, activation_func = get_layer_info(input_channel, activation_func)
 
-        self.up_16_32 = Up(1024, 256, activation_func)
-        self.up_32_32_1 = Conv(512, 256, 1, activation_func)
+        self.up_16_16_1 = Conv(input_channel, 256,  activation_func=activation_func)
+        self.up_16_16_2 = Conv(768, 512, activation_func=activation_func)
+        self.up_16_16_3 = Conv(1024, 512, activation_func=activation_func)
 
-        self.up_32_64 = Up(512, 128, activation_func)
-        self.up_64_64_1 = Conv(256, 128, 1, activation_func)
+        self.up_16_32 = Up(1024, 256, activation_func=activation_func)
+        self.up_32_32_1 = Conv(512, 256, activation_func=activation_func)
 
-        self.up_64_128 = Up(256, 64, activation_func)
-        self.up_128_128_1 = Conv(128, 64, 1, activation_func)
+        self.up_32_64 = Up(512, 128, activation_func=activation_func)
+        self.up_64_64_1 = Conv(256, 128, activation_func=activation_func)
 
-        self.up_128_256 = Up(128, 32, activation_func)
-        self.out_conv = Conv(64, out_channels, 1, activation_func='relu')
+        self.up_64_128 = Up(256, 64, activation_func=activation_func)
+        self.up_128_128_1 = Conv(128, 64, activation_func=activation_func)
+
+        self.up_128_256 = Up(128, 32, activation_func=activation_func)
+        self.out_conv = Conv(64, out_channels, activation_func='relu')
         
         # import pdb; pdb.set_trace()
         
@@ -138,17 +185,9 @@ class Up_Stream(nn.Module):
         
         # import pdb; pdb.set_trace()
         # multiple channel ibl
-        # tiled_l = l.view(-1, 512 * self.ibl_num, 1, 1).repeat(1, 1, 16, 16)
-        if not self.new_ibl:
-            tiled_l = l.view(-1, 512, 1, 1).repeat(1, 1, 16, 16)
-        else:
-            tiled_l = l.view(-1, 512 * 3, 1, 1).repeat(1, 1, 16, 16)
-        
-        # print("tiled_l: {}".format(tiled_l.size()))
+        y = l.view(-1, 512, 1, 1).repeat(1, 1, 16, 16)
 
-        y = self.up_16_16_1(tiled_l)    # 256 x 16 x 16
-        # print(y.size())
-        
+        y = self.up_16_16_1(y)    # 256 x 16 x 16
         # import pdb; pdb.set_trace()
         
         y = torch.cat((x10,y), dim=1)   # 768 x 16 x 16
@@ -195,6 +234,7 @@ class Up_Stream(nn.Module):
         # print(y.size())
         
         y = torch.cat((x1, y), dim=1)
+
         y = self.out_conv(y)          # 3 x 256 x 256
         
         return y

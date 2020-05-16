@@ -54,14 +54,13 @@ def reconstruct_loss(gt_img, pred_img):
     return torch.norm(gt_img-pred_img, 2)
 
 def get_grid_img(tensor_img):
-    return utils.make_grid(tensor_img).detach().cpu().unsqueeze(0)
+    return utils.make_grid(tensor_img, normalize=True).detach().cpu().unsqueeze(0)
 
 def visdom_plot_img(I_t, predicted_img, mask, L_t, is_training=True, save_batch=False):
     batch_size = min(I_t.shape[0], 4)
 
     vis_predicted_img = get_grid_img(predicted_img[:batch_size])
     vis_predicted_img_gt = get_grid_img(I_t[:batch_size])
-    # import pdb; pdb.set_trace()
 
     if save_batch:
         vis_predicted_img_np = np.clip(vis_predicted_img[0].detach().cpu().numpy().transpose((1,2,0)), 0.0, 1.0)
@@ -96,6 +95,8 @@ def training_iteration(model, train_dataloder, optimizer, train_loss, epoch_num)
             for i, (mask, light, shadow) in enumerate(train_dataloder):
                 I_s, L_t, I_t = mask.to(device), light.to(device), shadow.to(device)
 
+                # import pdb; pdb.set_trace()
+
                 optimizer.zero_grad()
                 
                 # predict
@@ -112,10 +113,10 @@ def training_iteration(model, train_dataloder, optimizer, train_loss, epoch_num)
                 # visualize results
                 if i % 10 == 0:
                     # divide_factor = 1.0 / torch.max(L_t) / 5.0
-                    divide_factor = 1.0
-                    visdom_plot_img(torch.clamp(I_t* divide_factor, 0.0, 1.0),
-                                torch.clamp(predicted_img * divide_factor, 0.0, 1.0),
-                                mask, L_t, save_batch=False)
+                    divide_factor = 0.1
+                    visdom_plot_img(torch.clamp(I_t* divide_factor, 0.0, 1.0) , 
+                                    torch.clamp(predicted_img * divide_factor, 0.0, 1.0), 
+                                    mask, L_t, save_batch=params.save)
 
                 # keep tracking
                 train_loss.append(loss.item()/np.sqrt(params.batch_size))
@@ -131,7 +132,7 @@ def validation_iteration(model, valid_dataloader, valid_loss, epoch_num):
     cur_epoch_loss = 0.0
     model.eval()
 
-    cur_timer = 1
+    cur_timer = params.timers
     with torch.no_grad():
         with tqdm(total=len(valid_dataloader) * params.timers) as t:
             t.set_description("(Validation)Ep. {} ".format(epoch_num))
@@ -152,7 +153,7 @@ def validation_iteration(model, valid_dataloader, valid_loss, epoch_num):
                     # visualize results
                     if i % 10 == 0:
                         # divide_factor = 1.0 / torch.max(L_t) / 5.0
-                        divide_factor = 1.0
+                        divide_factor = 0.1
                         visdom_plot_img(torch.clamp(I_t * divide_factor, 0.0, 1.0),
                                         torch.clamp(predicted_img * divide_factor, 0.0, 1.0),
                                         mask, L_t, False)
@@ -164,7 +165,7 @@ def validation_iteration(model, valid_dataloader, valid_loss, epoch_num):
                     t.update()
 
     # Finish one epoch
-    cur_epoch_loss /= (params.timers * len(valid_dataloader) * np.sqrt(cur_timer)) 
+    cur_epoch_loss /= (np.sqrt(params.batch_size) * len(valid_dataloader) * cur_timer) 
     return cur_epoch_loss
 
 def train(params):

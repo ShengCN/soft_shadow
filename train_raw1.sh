@@ -1,1 +1,1 @@
-CUDA_VISIBLE_DEVICES=2 python train_relight_ssn.py --new_exp --exp_name='1_ibl' --batch_size=28 --workers=24 --norm='batch_norm' --use_schedule --bilinear --ibl_num=1 --lr=1e-3 --scale_ibl --resume --weight_file='1_ibl_15-April-01-23-AM.pt'
+CUDA_VISIBLE_DEVICES=2 python train_relight_ssn.py --new_exp --exp_name='coord_conv' --batch_size=24 --workers=24 --norm='group_norm' --use_schedule --bilinear --lr=5e-4 --patience=5 --coordconv --timers=100 --small_ds --resume --weight_file='coord_conv_15-May-09-15-AM.pt' --relearn
