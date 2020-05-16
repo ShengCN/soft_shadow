@@ -15,6 +15,7 @@ class params():
             self.baseline = True
             self.vis_port = 8002
             self.need_train = True
+            self.cpu = True
 
         def set_params(self, options):
             self.options = options
@@ -28,7 +29,8 @@ class params():
             self.baseline = options.baseline
             self.vis_port = options.vis_port
             self.need_train = options.need_train
-
+            self.cpu = options.cpu
+            
         def __str__(self):
             return 'norm: {}  prelu: {} weight decay: {} small ds: {}'.format(self.norm, self.prelu, self.weight_decay, self.small_ds)
 

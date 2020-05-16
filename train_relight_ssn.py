@@ -16,7 +16,7 @@ from utils.net_utils import save_model, get_lr, set_lr
 from utils.visdom_utils import setup_visdom, visdom_plot_loss, visdom_log, visdom_show_batch
 from params import params as options, parse_params
 import matplotlib.pyplot as plt
-from evaluation import exp_predict
+from evaluation import exp_predict, exp_metric
 
 # parse args
 params = parse_params()
@@ -273,20 +273,20 @@ if __name__ == "__main__":
     result_log += 'best valid loss: {}'.format(best_valid_loss)
     
     model = Relight_SSN(1, 1)    # input is mask + human
-    model.to(device) 
     model.load_state_dict(checkpoint['model_state_dict'])
+    model.to(device) 
     
     # run predictions
     exp_output = os.path.join('exp_result', exp_name)
     os.makedirs(exp_output, exist_ok=True)
     eval_folder = 'dataset/evaluation'
-    exp_predict.predict(model, eval_folder, exp_output)
+    # exp_predict.predict(model, eval_folder, exp_output, device)
 
     # run metric eval
-
+    num_metric_result, size_metric_result = exp_metric.compute_exp_results(eval_folder, exp_output)
 
     # save results 
     exp_result_folder = 'exp_result'    
     os.makedirs(exp_result_folder, exist_ok=True)
-    with open(join(exp_result_folder, exp_name + ".txt"), 'w+') as f:
+    with open(os.path.join(exp_result_folder, exp_name + ".txt"), 'w+') as f:
         f.write(result_log)

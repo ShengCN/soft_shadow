@@ -1,4 +1,11 @@
-2020-05-16 09:45:48 INFO  main [mtsutil.cpp:232] Mitsuba version 0.6.0 (Linux, 64 bit), Copyright (c) 2017 Wenzel Jakob
-2020-05-16 09:45:48 INFO  main [mtsutil.cpp:366] Loading utility "tonemap" ..
-2020-05-16 09:45:48 INFO  main [Tonemap] Loading image "/home/ysheng/Documents/adobe_shadow_net/evaluation/../dataset/evaluation/simulated_combine_male_genesis8_lee8_armani_informalsuit_Base_Pose_Standing_A/pattern/num_43_size_0.09_ibl/pitch_30_rot_0_mask_mitsuba_shadow.exr" ..
-2020-05-16 09:45:48 INFO  main [Tonemap] Writing tonemapped image to "/home/ysheng/Documents/adobe_shadow_net/evaluation/../dataset/evaluation/simulated_combine_male_genesis8_lee8_armani_informalsuit_Base_Pose_Standing_A/pattern/num_43_size_0.09_ibl/pitch_30_rot_0_mask_mitsuba_shadow.png" ..
+2020-05-16 13:56:50 INFO  main [mitsuba.cpp:275] Mitsuba version 0.6.0 (Linux, 64 bit), Copyright (c) 2017 Wenzel Jakob
+2020-05-16 13:56:50 INFO  main [mitsuba.cpp:377] Parsing scene description from "/home/ysheng/Documents/adobe_shadow_net/evaluation/mts_shadow.xml" ..
+2020-05-16 13:56:50 INFO  main [PluginManager] Loading plugin "plugins/shadow_integrator.so" ..
+2020-05-16 13:56:50 INFO  main [PluginManager] Loading plugin "plugins/ldsampler.so" ..
+2020-05-16 13:56:50 INFO  main [PluginManager] Loading plugin "plugins/gaussian.so" ..
+2020-05-16 13:56:50 INFO  main [PluginManager] Loading plugin "plugins/hdrfilm.so" ..
+2020-05-16 13:56:50 INFO  main [PluginManager] Loading plugin "plugins/perspective.so" ..
+2020-05-16 13:56:50 INFO  main [PluginManager] Loading plugin "plugins/envmap.so" ..
+2020-05-16 13:56:50 INFO  main [EnvironmentMap] Loading environment map "num_1_size_0.06_ibl.png"
+2020-05-16 13:56:50 INFO  main [PluginManager] Loading plugin "plugins/lanczos.so" ..
+2020-05-16 13:56:50 INFO  main [EnvironmentMap] Precomputing data structures for environment map sampling (2.2 KiB)

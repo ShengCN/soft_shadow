@@ -75,7 +75,7 @@ def render_testing_set(dataset_folder):
 
                 mask_name = os.path.splitext(os.path.basename(mask_path))[0]
                 final_out_file, shadow_out_file = join(render_output, mask_name + '_mitsuba_final.exr'), join(render_output, mask_name + '_mitsuba_shadow.exr')
-                mitsuba_render(mask_path, ibl_file, final_out_file, shadow_out_file, final = False, update_cam_param=False, real_ibl=real_ibl, write_cmd=True, skip=False)
+                mitsuba_render(mask_path, ibl_file, final_out_file, shadow_out_file, final = False, update_cam_param=False, real_ibl=real_ibl, write_cmd=True, skip=True)
 
                 # copy mask and ibl to result folder
                 copyfile(mask_path, join(render_output, mask_name + '.png'))

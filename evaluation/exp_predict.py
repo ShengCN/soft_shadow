@@ -46,6 +46,8 @@ def to_net_ibl(ibl_file):
     return normalize_energy(ibl)
 
 to_tensor = ToTensor()
+device = torch.device('cpu')
+
 def net_render(model, mask_file, ibl_file, out_file, save_npy=True):
     mask_np = imageio.imread(mask_file)
     mask_np = mask_np[:,:,0]
@@ -76,7 +78,12 @@ def net_render(model, mask_file, ibl_file, out_file, save_npy=True):
     
     return shadow_predict
 
-def predict(model, mts_gt_folder, out_folder):
+def predict(model, mts_gt_folder, out_folder, dev):
+    def save_create_folder(dir, sub_folder):
+        new_folder = join(dir, sub_folder)
+        os.makedirs(new_folder, exist_ok=True)
+        return new_folder
+
     def find_ibl_mask(files):
         ibl, mask = '', ''
         for f in files:
@@ -88,15 +95,30 @@ def predict(model, mts_gt_folder, out_folder):
         
         return ibl, mask
 
+    device = dev
     model_folders = get_folders(mts_gt_folder)
-    
-    for model_folder in tqdm(model_folders):
-        ibl_root_folder = join(model_folder, 'pattern')
-        ibl_outputs = get_folders(ibl_root_folder)
-        for cur_out in ibl_outputs:
-            ibl_file, mask_file = find_ibl_mask(get_files(cur_out))
-            prefix = os.path.splitext(os.path.basename(mask_file))[0]
-            net_render(model, mask_file, ibl_file, join(cur_out, '{}_predict.npy').format(prefix))
+    ibl_num = len(get_folders(join(model_folders[0], 'pattern')))
+    total = len(model_folders) * ibl_num
+
+    with tqdm(total=total) as tbar:
+        for model_folder in tqdm(model_folders):        
+            model_name = os.path.basename(model_folder)
+            
+            exp_out_model = save_create_folder(out_folder, model_name)
+
+            ibl_root_folder = join(model_folder, 'pattern')
+            exp_ibl_out = save_create_folder(exp_out_model, 'pattern')
+
+            ibl_outputs = get_folders(ibl_root_folder)
+            for cur_out in ibl_outputs:
+                ibl_file, mask_file = find_ibl_mask(get_files(cur_out))
+                prefix = os.path.splitext(os.path.basename(mask_file))[0]
+                
+                cur_dir = os.path.basename(cur_out)
+                exp_pred_out = save_create_folder(exp_ibl_out, cur_dir)
+
+                net_render(model, mask_file, ibl_file, join(exp_pred_out, '{}_predict.npy').format(prefix))
+                tbar.update()
             
 
 if __name__ == "__main__":    

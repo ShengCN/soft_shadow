@@ -78,7 +78,7 @@ class Conv(nn.Module):
         parameter = params().get_params()
         if parameter.coordconv:
             self.use_coordconv = True
-            self.add_coord = add_coords()
+            self.add_coord = add_coords(use_cuda=not parameter.cpu)
         else:
             self.use_coordconv = False
 
