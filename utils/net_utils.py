@@ -58,7 +58,8 @@ def save_model(output_folder, model, optimizer, epoch, best_loss, exp_name, hist
         'hist_valid_loss': hist_valid_loss,
         'params':str(params)
         }, output_fname)
-
+    return output_fname
+    
 def get_lr(optimizer):
     for param_group in optimizer.param_groups:
         return param_group['lr']

@@ -28,14 +28,16 @@ parser.add_argument('-v', '--verbose', action='store_true', help='output file na
 options = parser.parse_args()
 print('options: ', options)
 
-# device = torch.device("cpu")
-device = torch.device("cuda:2" if torch.cuda.is_available() else "cpu")
+device = torch.device("cpu")
+# device = torch.device("cuda:2" if torch.cuda.is_available() else "cpu")
 print("Device: ", device)
 model = Relight_SSN(1,1)
-weight_file = options.weight
-checkpoint = torch.load(weight_file, map_location=device)    
-model.to(device)
-model.load_state_dict(checkpoint['model_state_dict'])
+
+# weight_file = options.weight
+# checkpoint = torch.load(weight_file, map_location=device)    
+# model.to(device)
+# model.load_state_dict(checkpoint['model_state_dict'])
+
 to_tensor = ToTensor()
 
 cam_world_dict = {}
@@ -297,6 +299,7 @@ def evaluate(mask_file, ibl_file, output, real_ibl=True):
     
     # merge result
     # merge_result(mitsuba_final, )
+
 
 if __name__ == '__main__':
     # evaluate(options.file, options.mask, options.ibl, options.output)

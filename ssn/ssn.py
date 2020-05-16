@@ -11,28 +11,29 @@ class Relight_SSN(nn.Module):
     def __init__(self, n_channels=3, out_channels=3):
         super(Relight_SSN, self).__init__()
         
-        # parameter = params().get_params()
-        # if parameter.prelu:
-        #     activation_func = 'prelu'
-        # else:
-        #     activation_func = 'relu'
-            
-        # norm_layer, activation_func = get_layer_info(32 - n_channels, activation_func)
+        parameter = params().get_params()
+        if parameter.prelu:
+            activation_func = 'prelu'
+        else:
+            activation_func = 'relu'
+        
+        norm_layer, activation_func = get_layer_info(32 - n_channels, activation_func)
 
-        # if norm_layer is not None:
-        #     self.in_conv = nn.Sequential(
-        #         nn.Conv2d(n_channels, 32 - n_channels, kernel_size=7, padding=3, bias=True),
-        #         norm_layer,
-        #         activation_func
-        #     )
-        # else:
-        #     self.in_conv = nn.Sequential(
-        #         nn.Conv2d(n_channels, 32 - n_channels, kernel_size=7, padding=3, bias=True),
-        #         activation_func
-        #     )
+        if parameter.baseline and (norm_layer is not None):
+            self.in_conv = nn.Sequential(
+                nn.Conv2d(n_channels, 32 - n_channels, kernel_size=7, padding=3, bias=True),
+                norm_layer,
+                activation_func
+            )
+        elif norm_layer is None:
+            self.in_conv = nn.Sequential(
+                nn.Conv2d(n_channels, 32 - n_channels, kernel_size=7, padding=3, bias=True),
+                activation_func
+            )
 
-        import pdb; pdb.set_trace()
-        self.in_conv       = Conv(n_channels, 32 - n_channels, kernel_size=7, conv_stride=1, padding=3, bias=True)
+        if parameter.coordconv:
+            self.in_conv       = Conv(n_channels, 32 - n_channels, kernel_size=7, conv_stride=1, padding=3, bias=True)
+
         self.down_256_128  = Conv(32, 64, conv_stride=2)
         self.down_128_128  = Conv(64, 64, conv_stride=1)
         self.down_128_64   = Conv(64, 128, conv_stride=2)

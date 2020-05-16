@@ -13,21 +13,23 @@ from ssn.ssn_dataset import SSN_Dataset
 # from ssn.ssn_submodule import Contract
 from ssn.ssn import Relight_SSN
 from utils.net_utils import save_model, get_lr, set_lr
-from utils.visdom_utils import visdom_plot_loss, visdom_relight_results, visdom_log, visdom_show_batch, visdom_show_light
+from utils.visdom_utils import setup_visdom, visdom_plot_loss, visdom_log, visdom_show_batch
 from params import params as options, parse_params
 import matplotlib.pyplot as plt
-
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-print("Device: ", device)
+from evaluation import exp_predict
 
 # parse args
 params = parse_params()
 print("Params: {}".format(params))
-if params.new_exp:
-    exp = 1
-else:
-    exp = 0
 exp_name = params.exp_name
+cur_viz = setup_visdom(params.vis_port)
+
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+if params.cpu:
+    device = torch.device('cpu')
+
+print("Device: ", device)
 
 """ https://discuss.pytorch.org/t/changing-the-weight-decay-on-bias-using-named-parameters/19132/3
 """
@@ -77,11 +79,9 @@ def visdom_plot_img(I_t, predicted_img, mask, L_t, is_training=True, save_batch=
     else:
         win_prefix = 'valid'
     vis_mask = get_grid_img(mask[:batch_size])
-    visdom_show_batch(vis_mask, win_name="{} masks".format(win_prefix), exp=exp, normalize=False)
-    visdom_show_batch(vis_shadow_img, win_name="{} shadow gt vs. inference".format(win_prefix), nrow=1,exp=exp, normalize=False)
-
-    if not params.new_ibl:
-        visdom_show_batch(get_grid_img(L_t[:batch_size]), win_name='{} light'.format(win_prefix), exp=exp, normalize=True)
+    visdom_show_batch(vis_mask, cur_viz, win_name="{} masks".format(win_prefix), normalize=False)
+    visdom_show_batch(vis_shadow_img, cur_viz, win_name="{} shadow gt vs. inference".format(win_prefix), nrow=1, normalize=False)
+    visdom_show_batch(get_grid_img(L_t[:batch_size]), cur_viz, win_name='{} light'.format(win_prefix), normalize=True)
 
 def training_iteration(model, train_dataloder, optimizer, train_loss, epoch_num):
     # training
@@ -120,7 +120,7 @@ def training_iteration(model, train_dataloder, optimizer, train_loss, epoch_num)
 
                 # keep tracking
                 train_loss.append(loss.item()/np.sqrt(params.batch_size))
-                visdom_plot_loss("train_total_loss", train_loss, exp)
+                visdom_plot_loss("train_total_loss", train_loss, cur_viz)
 
                 t.update()
 
@@ -161,11 +161,14 @@ def validation_iteration(model, valid_dataloader, valid_loss, epoch_num):
                     # keep tracking
                     valid_loss.append(loss.item()/np.sqrt(params.batch_size))
 
-                    visdom_plot_loss("valid_total_loss", valid_loss, exp)
+                    visdom_plot_loss("valid_total_loss", valid_loss, cur_viz)
                     t.update()
 
     # Finish one epoch
+    # import pdb; pdb.set_trace()
     cur_epoch_loss /= (np.sqrt(params.batch_size) * len(valid_dataloader) * cur_timer) 
+    # cur_epoch_loss /= (params.timers * len(train_dataloder) * np.sqrt(params.batch_size))
+
     return cur_epoch_loss
 
 def train(params):
@@ -187,13 +190,12 @@ def train(params):
     model.to(device)    
     optimizer = set_model_optimizer(model, params.weight_decay)
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=params.patience)
-    
-#     import pdb;pdb.set_trace()
+    best_weight = ''
+
+    # import pdb;pdb.set_trace()
     
     # resume from last saved points
     if params.resume:
-        # print("Not implemented yet, remember to implement")
-        # best_weight = "weights/cross entropy loss_04-December-07-56-PM.pt"
         best_weight = os.path.join("weights", params.weight_file)
         checkpoint = torch.load(best_weight, map_location=device)
         model.load_state_dict(checkpoint['model_state_dict'])
@@ -232,26 +234,59 @@ def train(params):
             scheduler.step(cur_valid_loss)
 
         log_info += "Current epoch: {} Learning Rate: {}  <br>".format(epoch, get_lr(optimizer))
-        visdom_log(log_info, exp=exp)
+        visdom_log(log_info, cur_viz)
 
         hist_train_loss.append(cur_train_loss)
         hist_valid_loss.append(cur_valid_loss)
 
-        visdom_plot_loss("history train loss", hist_train_loss, exp=exp)
-        visdom_plot_loss("history valid loss", hist_valid_loss, exp=exp)
+        visdom_plot_loss("history train loss", hist_train_loss, cur_viz)
+        visdom_plot_loss("history valid loss", hist_valid_loss, cur_viz)
 
         log_info += "Epoch: {} training loss: {}, valid loss: {}  <br>".format(epoch, cur_train_loss, cur_valid_loss)
         # save results
         if best_valid_loss > cur_valid_loss:
             log_info += "<br> ---------- Exp: {} Find better loss: {} at {} --------  <br>".format(exp_name, cur_valid_loss, datetime.datetime.now())
-            visdom_log(log_info, exp=exp)
+            visdom_log(log_info, cur_viz)
 
             best_valid_loss = cur_valid_loss
             global_params = options().get_params()
-            save_model("weights", model, optimizer, epoch, best_valid_loss, exp_name, hist_train_loss, hist_valid_loss, global_params)
+            best_weight = save_model("weights", model, optimizer, epoch, best_valid_loss, exp_name, hist_train_loss, hist_valid_loss, global_params)
+
+        # termination
+        if get_lr(optimizer) < 1e-5:
+            break
 
     print("Training finished")
+    return best_weight
 
 if __name__ == "__main__":    
     # trainig
-    train(params)
+    result_log = ''
+    if params.need_train:
+        best_weight, best_valid_loss = train(params)
+    else: 
+        best_weight = os.path.join("weights", params.weight_file)
+    
+    checkpoint = torch.load(best_weight, map_location=device)
+    best_valid_loss = checkpoint['best_loss']
+
+    result_log += 'best valid loss: {}'.format(best_valid_loss)
+    
+    model = Relight_SSN(1, 1)    # input is mask + human
+    model.to(device) 
+    model.load_state_dict(checkpoint['model_state_dict'])
+    
+    # run predictions
+    exp_output = os.path.join('exp_result', exp_name)
+    os.makedirs(exp_output, exist_ok=True)
+    eval_folder = 'dataset/evaluation'
+    exp_predict.predict(model, eval_folder, exp_output)
+
+    # run metric eval
+
+
+    # save results 
+    exp_result_folder = 'exp_result'    
+    os.makedirs(exp_result_folder, exist_ok=True)
+    with open(join(exp_result_folder, exp_name + ".txt"), 'w+') as f:
+        f.write(result_log)

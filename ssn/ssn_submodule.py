@@ -119,23 +119,8 @@ class Up(nn.Module):
             activation_func = 'relu'
         norm_layer, activation_func = get_layer_info(out_channels, activation_func)
         
-        if not parameter.bilinear:
-            up_layer = nn.ConvTranspose2d(in_channels, out_channels, kernel_size=2, stride=2)
-            self.up = nn.Sequential(
-                up_layer,
-                norm_layer,
-                activation_func=activation_func)
-        else:
-            up_layer = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
-            if parameter.double_conv:
-                self.up = nn.Sequential(
-                    up_layer,
-                    Conv(in_channels, in_channels//2,  activation_func=activation_func),
-                    Conv(in_channels//2, out_channels, activation_func= activation_func),
-                    norm_layer,
-                    activation_func)
-            else:
-                self.up = nn.Sequential(
+        up_layer = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
+        self.up = nn.Sequential(
                     up_layer,
                     Conv(in_channels, in_channels//4, activation_func= activation_func),
                     norm_layer,
@@ -156,9 +141,6 @@ class Up_Stream(nn.Module):
         else:
             activation_func='relu'
 
-        self.ibl_num = parameter.ibl_num
-        self.new_ibl = parameter.new_ibl
-        
         input_channel = 512
         norm_layer, activation_func = get_layer_info(input_channel, activation_func)
 

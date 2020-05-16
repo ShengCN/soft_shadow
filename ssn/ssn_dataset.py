@@ -83,7 +83,7 @@ class SSN_Dataset(Dataset):
         print('training: {}, validation: {}'.format(self.training_num, self.training_num//10))
         
         if parameter.small_ds:
-            self.training_num = self.training_num//30
+            self.training_num = self.training_num//20
         
         self.random_pattern_generator = random_pattern()
         
