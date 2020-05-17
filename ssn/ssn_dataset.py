@@ -2,19 +2,18 @@ import sys
 sys.path.append("..")
 
 import os
+from os.path import join
 import torch
 import numpy as np
 import torch
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms, utils
-import pandas as pd
-from PIL import Image
 import time
 import random
 import matplotlib.pyplot as plt
 import cv2
 from params import params
-from .random_pattern import random_pattern
+from random_pattern import random_pattern
 
 class To_Normalized_Img(object):
     """Convert PIL image to [0,1] numpy"""
@@ -58,7 +57,7 @@ class Mask_Transform(object):
         return img[:,:,0:1]
     
 class SSN_Dataset(Dataset):
-    def __init__(self, csv_meta_file, is_training):
+    def __init__(self, ds_dir, is_training):
         start = time.time()
         
         # # of samples in each group
@@ -66,7 +65,8 @@ class SSN_Dataset(Dataset):
         self.ibl_group_size = 16
         
         parameter = params().get_params()
-        self.meta_data = pd.read_csv(csv_meta_file, header=None).to_numpy()
+        # self.meta_data = pd.read_csv(csv_meta_file, header=None).to_numpy()
+        self.meta_data = self.init_meta(ds_dir)
 
         self.is_training = is_training
         self.to_tensor = ToTensor()
@@ -118,7 +118,12 @@ class SSN_Dataset(Dataset):
         if is_log:
             s = time.time()
         shadow_path, mask_path = self.meta_data[idx]  
-        mask_img, shadow_bases = np.expand_dims(np.load(mask_path), axis=2), np.load(shadow_path)
+        mask_img = plt.imread(mask_path)
+        mask_img = mask_img[:,:,0]
+        if mask_img.dtype == np.uint8:
+            mask_img = mask_img/ 255.0
+
+        mask_img, shadow_bases = np.expand_dims(mask_img, axis=2), np.load(shadow_path)
         if is_log:
             elapsed = time.time() - s
             log_info = '{} loading file time: {} \n'.format(idx, elapsed)
@@ -136,6 +141,20 @@ class SSN_Dataset(Dataset):
         
         return mask_img, light_img, shadow_img
     
+    def init_meta(self, ds_dir):
+        base_folder = join(ds_dir, 'base')
+        mask_folder = join(ds_dir, 'cache/mask')
+        model_list = [f for f in os.listdir(base_folder) if os.path.isdir(join(base_folder, f))]
+        metadata = []
+        for m in model_list:
+            shadow_folder, cur_mask_folder = join(base_folder, m), join(mask_folder, m)
+            shadows = [f for f in os.listdir(shadow_folder) if f.find('_shadow.npy')!=-1]
+            for s in shadows:
+                prefix = s[:s.find('_shadow')]
+                metadata.append((join(shadow_folder, s), join(cur_mask_folder, prefix + '_mask.png')))
+        
+        return metadata
+
     def get_prefix(self, path):
         folder = os.path.dirname(path)
         basename = os.path.basename(path)

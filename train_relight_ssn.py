@@ -180,10 +180,11 @@ def train(params):
     hist_train_loss, hist_valid_loss, hist_lr = [], [], []
 
     # dataset
-    ds_csv = "/home/ysheng/Dataset/new_dataset/meta_data.csv"
-    train_set = SSN_Dataset(ds_csv, True)
+    # ds_csv = "/home/ysheng/Dataset/new_dataset/meta_data.csv"
+    ds_folder = './dataset/new_dataset'
+    train_set = SSN_Dataset(ds_folder, True)
     train_dataloder = DataLoader(train_set, batch_size= min(len(train_set), params.batch_size), shuffle=True, num_workers=params.workers, drop_last=True)
-    valid_set = SSN_Dataset(ds_csv, False)
+    valid_set = SSN_Dataset(ds_folder, False)
     valid_dataloader = DataLoader(valid_set, batch_size= min(len(valid_set), params.batch_size), shuffle=False, num_workers=params.workers, drop_last=True)
 
     # model & optimizer & scheduler & loss function
