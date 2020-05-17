@@ -7,6 +7,7 @@ import time
 from tqdm import tqdm
 import numpy as np
 import os
+from os.path import join
 import datetime
 
 from ssn.ssn_dataset import SSN_Dataset
@@ -17,6 +18,7 @@ from utils.visdom_utils import setup_visdom, visdom_plot_loss, visdom_log, visdo
 from params import params as options, parse_params
 import matplotlib.pyplot as plt
 from evaluation import exp_predict, exp_metric
+import pickle 
 
 # parse args
 params = parse_params()
@@ -175,8 +177,7 @@ def train(params):
     # history logs
     best_valid_loss = float('inf')
     log_info = ""
-    hist_train_loss = []
-    hist_valid_loss = []
+    hist_train_loss, hist_valid_loss, hist_lr = [], [], []
 
     # dataset
     ds_csv = "/home/ysheng/Dataset/new_dataset/meta_data.csv"
@@ -189,7 +190,6 @@ def train(params):
     model = Relight_SSN(1, 1)    # input is mask + human
     model.to(device)    
     optimizer = set_model_optimizer(model, params.weight_decay)
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=params.patience)
     best_weight = ''
 
     # import pdb;pdb.set_trace()
@@ -203,6 +203,8 @@ def train(params):
         best_valid_loss = checkpoint['best_loss']
         hist_train_loss = checkpoint['hist_train_loss']
         hist_valid_loss = checkpoint['hist_valid_loss']
+        if 'hist_lr' in checkpoint.keys():
+            hist_lr = checkpoint['hist_lr']
         print("resuming from: {}".format(best_weight))
         del checkpoint
     
@@ -216,8 +218,9 @@ def train(params):
         model = nn.DataParallel(model)
 
     set_lr(optimizer, params.lr)
-
     print("Current LR: {}".format(get_lr(optimizer)))
+    # scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=params.patience)
+    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=30, gamma=0.1, last_epoch=-1)
 
     # training states
     train_loss, valid_loss = [], []
@@ -231,7 +234,7 @@ def train(params):
         cur_valid_loss = validation_iteration(model, valid_dataloader, valid_loss, epoch)
         
         if params.use_schedule:
-            scheduler.step(cur_valid_loss)
+            scheduler.step()
 
         log_info += "Current epoch: {} Learning Rate: {}  <br>".format(epoch, get_lr(optimizer))
         visdom_log(log_info, cur_viz)
@@ -250,10 +253,10 @@ def train(params):
 
             best_valid_loss = cur_valid_loss
             global_params = options().get_params()
-            best_weight = save_model("weights", model, optimizer, epoch, best_valid_loss, exp_name, hist_train_loss, hist_valid_loss, global_params)
+            best_weight = save_model("weights", model, optimizer, epoch, best_valid_loss, exp_name, hist_train_loss, hist_valid_loss, hist_lr, global_params)
 
         # termination
-        if get_lr(optimizer) < 1e-5:
+        if get_lr(optimizer) < 1e-7:
             break
 
     print("Training finished")
@@ -270,23 +273,39 @@ if __name__ == "__main__":
     checkpoint = torch.load(best_weight, map_location=device)
     best_valid_loss = checkpoint['best_loss']
 
-    result_log += 'best valid loss: {}'.format(best_valid_loss)
+    result_log += 'best valid loss: {} \n'.format(best_valid_loss)
     
     model = Relight_SSN(1, 1)    # input is mask + human
-    model.load_state_dict(checkpoint['model_state_dict'])
     model.to(device) 
+    model.load_state_dict(checkpoint['model_state_dict'])
     
     # run predictions
     exp_output = os.path.join('exp_result', exp_name)
     os.makedirs(exp_output, exist_ok=True)
     eval_folder = 'dataset/evaluation'
-    # exp_predict.predict(model, eval_folder, exp_output, device)
+    exp_predict.predict(model, eval_folder, exp_output, device)
 
     # run metric eval
     num_metric_result, size_metric_result = exp_metric.compute_exp_results(eval_folder, exp_output)
+    num_avg, size_avg = np.zeros((1,3)), np.zeros((1,3))
+    for k in num_metric_result.keys():
+        num_avg += num_metric_result[k] / len(num_metric_result.keys())
+
+    print("average result: ", num_avg)
+    result_log += 'average result: {} \n'.format(num_avg)
 
     # save results 
-    exp_result_folder = 'exp_result'    
+    exp_result_folder = 'exp_log'
     os.makedirs(exp_result_folder, exist_ok=True)
+    exp_result_folder = join(exp_result_folder, exp_name)
+    os.makedirs(exp_result_folder, exist_ok=True)
+
     with open(os.path.join(exp_result_folder, exp_name + ".txt"), 'w+') as f:
         f.write(result_log)
+    
+    num_metric_savefname, size_metric_savefname = os.path.join(exp_result_folder, exp_name + '_ibl.pkl'), os.path.join(exp_result_folder, exp_name + '_num.pkl')
+    with open(num_metric_savefname, 'wb') as f:
+        pickle.dump(num_metric_result, f)
+
+    with open(size_metric_savefname, 'wb') as f:
+        pickle.dump(size_metric_result, f)

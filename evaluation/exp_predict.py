@@ -46,9 +46,8 @@ def to_net_ibl(ibl_file):
     return normalize_energy(ibl)
 
 to_tensor = ToTensor()
-device = torch.device('cpu')
 
-def net_render(model, mask_file, ibl_file, out_file, save_npy=True):
+def net_render(model, device, mask_file, ibl_file, out_file, save_npy=True):
     mask_np = imageio.imread(mask_file)
     mask_np = mask_np[:,:,0]
     if mask_np.dtype == np.uint8:
@@ -95,7 +94,6 @@ def predict(model, mts_gt_folder, out_folder, dev):
         
         return ibl, mask
 
-    device = dev
     model_folders = get_folders(mts_gt_folder)
     ibl_num = len(get_folders(join(model_folders[0], 'pattern')))
     total = len(model_folders) * ibl_num
@@ -117,7 +115,7 @@ def predict(model, mts_gt_folder, out_folder, dev):
                 cur_dir = os.path.basename(cur_out)
                 exp_pred_out = save_create_folder(exp_ibl_out, cur_dir)
 
-                net_render(model, mask_file, ibl_file, join(exp_pred_out, '{}_predict.npy').format(prefix))
+                net_render(model, dev, mask_file, ibl_file, join(exp_pred_out, '{}_predict.npy').format(prefix))
                 tbar.update()
             
 

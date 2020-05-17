@@ -38,7 +38,7 @@ def save_loss(figure_fname, train_loss, valid_loss):
     plt.legend(['train_loss', 'valid_loss'])
     plt.savefig(figure_fname)
 
-def save_model(output_folder, model, optimizer, epoch, best_loss, exp_name, hist_train_loss, hist_valid_loss, params):
+def save_model(output_folder, model, optimizer, epoch, best_loss, exp_name, hist_train_loss, hist_valid_loss, hist_lr, params):
     """ Save current best model into some folder """
     create_folder(output_folder)
 
@@ -56,6 +56,7 @@ def save_model(output_folder, model, optimizer, epoch, best_loss, exp_name, hist
         'optimizer_state_dict': optimizer.state_dict(),
         'hist_train_loss': hist_train_loss,
         'hist_valid_loss': hist_valid_loss,
+        'hist_lr':hist_lr,
         'params':str(params)
         }, output_fname)
     return output_fname
