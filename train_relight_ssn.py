@@ -134,6 +134,7 @@ def training_iteration(model, train_dataloder, optimizer, train_loss, epoch_num)
                 train_loss.append(loss.item()/np.sqrt(params.batch_size))
                 visdom_plot_loss("train_total_loss", train_loss, cur_viz)
                 
+                train_loss_ax.clear()
                 train_loss_ax.plot(train_loss)
                 train_loss_figure.savefig('{}_train_loss.png'.format(exp_name))
 
@@ -258,6 +259,8 @@ def train(params):
 
         visdom_plot_loss("history train loss", hist_train_loss, cur_viz)
         visdom_plot_loss("history valid loss", hist_valid_loss, cur_viz)
+        
+        hist_loss_ax.clear()
         hist_loss_ax.plot(hist_train_loss, label='train')
         hist_loss_ax.plot(hist_valid_loss, label='valid')
         hist_loss_ax.legend()
