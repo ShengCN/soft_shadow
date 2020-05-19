@@ -63,7 +63,7 @@ def get_grid_img(tensor_img):
 def visdom_plot_img(I_t, predicted_img, mask, L_t, is_training=True, save_batch=False):
     batch_size = min(I_t.shape[0], 4)
     global plt_save_counter
-    
+
     vis_predicted_img = get_grid_img(predicted_img[:batch_size])
     vis_predicted_img_gt = get_grid_img(I_t[:batch_size])
 
@@ -126,6 +126,8 @@ def training_iteration(model, train_dataloder, optimizer, train_loss, epoch_num)
                 # keep tracking
                 train_loss.append(loss.item()/np.sqrt(params.batch_size))
                 visdom_plot_loss("train_total_loss", train_loss, cur_viz)
+                plt.plot(train_loss)
+                plt.savefig('train_loss.png')
 
                 t.update()
 
