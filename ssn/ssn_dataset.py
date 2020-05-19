@@ -62,17 +62,16 @@ class SSN_Dataset(Dataset):
         
         # # of samples in each group
         # magic number here
-        self.ibl_group_size = 16
-        
         parameter = params().get_params()
         # self.meta_data = pd.read_csv(csv_meta_file, header=None).to_numpy()
         self.meta_data = self.init_meta(ds_dir)
-
+        self.meta_data = self.meta_data
         self.is_training = is_training
         self.to_tensor = ToTensor()
         self.mask_transfrom = Mask_Transform()
         self.ibl_transform = IBL_Transform()
-        
+        self.flip = parameter.flip
+
         end = time.time()
         print("Dataset initialize spent: {} ms".format(end - start))
 
@@ -123,7 +122,11 @@ class SSN_Dataset(Dataset):
         if mask_img.dtype == np.uint8:
             mask_img = mask_img/ 255.0
 
-        mask_img, shadow_bases = np.expand_dims(mask_img, axis=2), np.load(shadow_path)
+        if self.flip:
+            mask_img, shadow_bases = np.expand_dims(mask_img, axis=2), 1.0 - np.load(shadow_path)
+        else:
+            mask_img, shadow_bases = np.expand_dims(mask_img, axis=2), np.load(shadow_path)
+        
         if is_log:
             elapsed = time.time() - s
             log_info = '{} loading file time: {} \n'.format(idx, elapsed)

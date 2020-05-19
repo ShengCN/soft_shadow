@@ -25,9 +25,9 @@ params = parse_params()
 print("Params: {}".format(params))
 exp_name = params.exp_name
 cur_viz = setup_visdom(params.vis_port)
+plt_save_counter = 0
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
 if params.cpu:
     device = torch.device('cpu')
 
@@ -70,9 +70,10 @@ def visdom_plot_img(I_t, predicted_img, mask, L_t, is_training=True, save_batch=
         vis_predicted_img_np = np.clip(vis_predicted_img[0].detach().cpu().numpy().transpose((1,2,0)), 0.0, 1.0)
         vis_predicted_img_gt_np = np.clip(vis_predicted_img_gt[0].detach().cpu().numpy().transpose((1,2,0)), 0.0, 1.0)
         saving_folder = 'training_result'
-        pred_fname, gt_fname = os.path.join(saving_folder, 'predict_{}.png'.format(datetime.datetime.now())), os.path.join(saving_folder,'gt_{}.png'.format(datetime.datetime.now()))
+        pred_fname, gt_fname = os.path.join(saving_folder, 'predict_{:06d}.png'.format(plt_save_counter)), os.path.join(saving_folder,'gt_{:06d}.png'.format(plt_save_counter))
         plt.imsave(pred_fname, vis_predicted_img_np, cmap='gray')
         plt.imsave(gt_fname, vis_predicted_img_gt_np, cmap='gray')
+        plt_save_counter = (plt_save_counter+1) % 20 
 
     vis_shadow_img = torch.cat((vis_predicted_img_gt,
                                 vis_predicted_img))
