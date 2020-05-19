@@ -62,7 +62,8 @@ def get_grid_img(tensor_img):
 
 def visdom_plot_img(I_t, predicted_img, mask, L_t, is_training=True, save_batch=False):
     batch_size = min(I_t.shape[0], 4)
-
+    global plt_save_counter
+    
     vis_predicted_img = get_grid_img(predicted_img[:batch_size])
     vis_predicted_img_gt = get_grid_img(I_t[:batch_size])
 
@@ -70,6 +71,7 @@ def visdom_plot_img(I_t, predicted_img, mask, L_t, is_training=True, save_batch=
         vis_predicted_img_np = np.clip(vis_predicted_img[0].detach().cpu().numpy().transpose((1,2,0)), 0.0, 1.0)
         vis_predicted_img_gt_np = np.clip(vis_predicted_img_gt[0].detach().cpu().numpy().transpose((1,2,0)), 0.0, 1.0)
         saving_folder = 'training_result'
+        
         pred_fname, gt_fname = os.path.join(saving_folder, 'predict_{:06d}.png'.format(plt_save_counter)), os.path.join(saving_folder,'gt_{:06d}.png'.format(plt_save_counter))
         plt.imsave(pred_fname, vis_predicted_img_np, cmap='gray')
         plt.imsave(gt_fname, vis_predicted_img_gt_np, cmap='gray')
