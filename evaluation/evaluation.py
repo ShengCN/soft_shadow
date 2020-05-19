@@ -22,21 +22,20 @@ parser.add_argument('-f', '--file', type=str, help='input model file')
 parser.add_argument('-m', '--mask', type=str, help='mask file')
 parser.add_argument('-i', '--ibl', type=str, help='ibl file')
 parser.add_argument('-o', '--output', type=str, help='output folder')
-parser.add_argument('-w', '--weight', type=str, help='weight of current model', default='../weights/new_pattern_11-May-09-59-PM.pt')
+parser.add_argument('-w', '--weight', type=str, help='weight of current model', default='../weights/group_norm_15-May-07-45-PM.pt')
 parser.add_argument('-v', '--verbose', action='store_true', help='output file name')
 
 options = parser.parse_args()
 print('options: ', options)
 
-device = torch.device("cpu")
-# device = torch.device("cuda:2" if torch.cuda.is_available() else "cpu")
+# device = torch.device("cpu")
+device = torch.device("cuda:2" if torch.cuda.is_available() else "cpu")
 print("Device: ", device)
 model = Relight_SSN(1,1)
-
-# weight_file = options.weight
-# checkpoint = torch.load(weight_file, map_location=device)    
-# model.to(device)
-# model.load_state_dict(checkpoint['model_state_dict'])
+weight_file = options.weight
+checkpoint = torch.load(weight_file, map_location=device)    
+model.to(device)
+model.load_state_dict(checkpoint['model_state_dict'])
 
 to_tensor = ToTensor()
 
@@ -168,7 +167,7 @@ def mitsuba_render(mask_file, ibl_file, final_out_file, shadow_out_file, final=T
         if ibl_np.dtype == np.uint8:
             ibl_np = ibl_np/255.0
 
-        tone_scale = 465 * np.sum(ibl_np)
+        tone_scale = 4 * np.sum(ibl_np)
     final_tonemapping_cmd = '{} tonemap -m {} {}'.format(mitsuba_util_bash, tone_scale, final_out_file)
 
     if write_cmd:
@@ -252,7 +251,7 @@ def net_render(mask_file, ibl_file, out_file, save_npy=True):
     if mask_np.dtype == np.uint8:
         mask_np = mask_np/255.0
 
-    mask, ibl = to_tensor(np.expand_dims(mask_np, axis=2)), to_tensor(np.expand_dims(cv2.resize(ibl, (32,16), interpolation=cv2.INTER_NEAREST), axis=2))
+    mask, ibl = to_tensor(np.expand_dims(mask_np, axis=2)), to_tensor(np.expand_dims(cv2.resize(ibl, (32,16)), axis=2))
     with torch.no_grad():
         I_s, L_t = torch.unsqueeze(mask.to(device),0), torch.unsqueeze(ibl.to(device),0)
 
@@ -260,7 +259,9 @@ def net_render(mask_file, ibl_file, out_file, save_npy=True):
 
     shadow_predict = np.squeeze(predicted_img[0].detach().cpu().numpy().transpose((1,2,0)))
     if save_npy:
-        np.save(out_file, shadow_predict)
+        dirname, fname = os.path.dirname(out_file), os.path.splitext(os.path.basename(out_file))[0]
+        npy_out = os.path.join(dirname, fname + '.npy')
+        np.save(npy_out, shadow_predict)
     
     dirname, fname = os.path.dirname(out_file), os.path.splitext(os.path.basename(out_file))[0]
     png_output = os.path.join(dirname, fname + '.png')

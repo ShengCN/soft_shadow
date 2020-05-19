@@ -3,6 +3,7 @@ import math
 
 def input_check(I1, I2):
     if len(I1.shape) != 2 or len(I2.shape) != 2:
+        assert False, 'please check metric input'
         return False
     return True
 

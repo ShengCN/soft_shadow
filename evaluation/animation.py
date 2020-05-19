@@ -33,14 +33,32 @@ class base_ibl_animator(object):
             print('vec: \n ', self.cur_vec)
             print('size:\n ',self.cur_resize)
 
+    def compute_center(self, j):
+        center_vel = self.cur_vec[j]
+        center_vel[:] = 0.0
+
+        for i, p in enumerate(self.cur_vec):
+            if i == j:
+                continue
+            
+            center_vel += self.cur_vec[i] / len(self.cur_vec)
+        
+        return center_vel
+
     def move_advance(self):
         for i, p in enumerate(self.cur_pos):
             self.cur_pos[i] += self.cur_vec[i] * 2.0
 
-            factor = 0.8
-            self.cur_vec[i][0] = factor * self.cur_vec[i][0] + (1.0-factor) * (random.random() * 2.0 - 1.0)
-            self.cur_vec[i][1] = factor * self.cur_vec[i][1] + (1.0-factor) * (random.random() * 2.0 - 1.0)
-            self.cur_vec[i] = self.cur_vec[i]/np.linalg.norm(self.cur_vec[i], 2)
+            if self.num != 1:
+                center_vel = self.compute_center(i)
+            else:
+                center_vel = -self.cur_vec[i]
+            factor = 1.0
+            self.cur_vec[i][0] = -1.0 * factor * center_vel[0] + (1.0-factor) * (random.random() * 2.0 - 1.0)
+            self.cur_vec[i][1] = -1.0 * factor * center_vel[1] + (1.0-factor) * (random.random() * 2.0 - 1.0)
+            
+            speed = 0.4
+            self.cur_vec[i] = self.cur_vec[i]/np.linalg.norm(self.cur_vec[i], 2) * speed
 
             if self.cur_pos[i][0] >= 511 or self.cur_pos[i][0]<=1:
                 self.cur_vec[i][0] = -self.cur_vec[i][0]
@@ -77,17 +95,26 @@ class base_ibl_animator(object):
                     xdensity=512)
         return gs()
 
+    def print_status(self):
+        print('position: ')
+        print(self.cur_pos)
+        print('velocitiy: ')
+        print(self.cur_vec)
+        print('size: ')
+        print(self.cur_size)
+
     # interface 
     def animate_ibl(self, iteration, max_iter):
-
         # 24 * 30 = 720 frames
         # 24 * 15 = 360, just move
-        if iteration < 360:
+        if iteration < max_iter//2:
             self.move_advance()
+            # self.print_status()   
+
             return self.get_cur_ibl()
 
         # 24 * 5 = 360 + 120 = 480, scale the blob size
-        if iteration >= 360 and iteration < 480: 
+        if iteration >= max_iter//2 and iteration < max_iter//2 + max_iter//6: 
             self.resize_advance()
             return self.get_cur_ibl()
 
