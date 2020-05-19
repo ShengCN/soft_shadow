@@ -65,7 +65,6 @@ class SSN_Dataset(Dataset):
         parameter = params().get_params()
         # self.meta_data = pd.read_csv(csv_meta_file, header=None).to_numpy()
         self.meta_data = self.init_meta(ds_dir)
-        self.meta_data = self.meta_data
         self.is_training = is_training
         self.to_tensor = ToTensor()
         self.mask_transfrom = Mask_Transform()

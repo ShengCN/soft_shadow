@@ -26,12 +26,19 @@ print("Params: {}".format(params))
 exp_name = params.exp_name
 cur_viz = setup_visdom(params.vis_port)
 plt_save_counter = 0
+exp_save_folder = 'training_result'
+os.makedirs(exp_save_folder, exist_ok=True)
+exp_save_folder = join(exp_save_folder, exp_name)
+os.makedirs(exp_save_folder, exist_ok=True)
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 if params.cpu:
     device = torch.device('cpu')
 
 print("Device: ", device)
+hist_loss_figure, train_loss_figure = plt.figure(), plt.figure()
+hist_loss_ax, train_loss_ax = hist_loss_figure.gca(), train_loss_figure.gca()
+
 
 """ https://discuss.pytorch.org/t/changing-the-weight-decay-on-bias-using-named-parameters/19132/3
 """
@@ -70,7 +77,7 @@ def visdom_plot_img(I_t, predicted_img, mask, L_t, is_training=True, save_batch=
     if save_batch:
         vis_predicted_img_np = np.clip(vis_predicted_img[0].detach().cpu().numpy().transpose((1,2,0)), 0.0, 1.0)
         vis_predicted_img_gt_np = np.clip(vis_predicted_img_gt[0].detach().cpu().numpy().transpose((1,2,0)), 0.0, 1.0)
-        saving_folder = 'training_result'
+        saving_folder = exp_save_folder
         
         pred_fname, gt_fname = os.path.join(saving_folder, 'predict_{:06d}.png'.format(plt_save_counter)), os.path.join(saving_folder,'gt_{:06d}.png'.format(plt_save_counter))
         plt.imsave(pred_fname, vis_predicted_img_np, cmap='gray')
@@ -126,8 +133,9 @@ def training_iteration(model, train_dataloder, optimizer, train_loss, epoch_num)
                 # keep tracking
                 train_loss.append(loss.item()/np.sqrt(params.batch_size))
                 visdom_plot_loss("train_total_loss", train_loss, cur_viz)
-                plt.plot(train_loss)
-                plt.savefig('train_loss.png')
+                
+                train_loss_ax.plot(train_loss)
+                train_loss_figure.savefig('{}_train_loss.png'.format(exp_name))
 
                 t.update()
 
@@ -250,6 +258,10 @@ def train(params):
 
         visdom_plot_loss("history train loss", hist_train_loss, cur_viz)
         visdom_plot_loss("history valid loss", hist_valid_loss, cur_viz)
+        hist_loss_ax.plot(hist_train_loss, label='train')
+        hist_loss_ax.plot(hist_valid_loss, label='valid')
+        hist_loss_ax.legend()
+        hist_loss_figure.savefig('{}_train_valid_loss.png'.format(exp_name))
 
         log_info += "Epoch: {} training loss: {}, valid loss: {}  <br>".format(epoch, cur_train_loss, cur_valid_loss)
         # save results
