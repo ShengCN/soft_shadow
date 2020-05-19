@@ -16,6 +16,7 @@ class params():
             self.vis_port = 8002
             self.need_train = True
             self.cpu = True
+            self.psp = False
 
         def set_params(self, options):
             self.options = options
@@ -30,6 +31,7 @@ class params():
             self.vis_port = options.vis_port
             self.need_train = options.need_train
             self.cpu = options.cpu
+            self.psp = options.psp
             
         def __str__(self):
             return 'norm: {}  prelu: {} weight decay: {} small ds: {}'.format(self.norm, self.prelu, self.weight_decay, self.small_ds)
@@ -73,6 +75,7 @@ def parse_params():
     parser.add_argument('--baseline', action='store_true', help='baseline method')
     parser.add_argument('--coordconv', action='store_true', help='use coord convolution')
     parser.add_argument('--cpu', action='store_true', help='Force training on CPU')
+    parser.add_argument('--psp', action='store_true', help='PSP bottleneck')
 
     arguments = parser.parse_args()
     parameter = params()

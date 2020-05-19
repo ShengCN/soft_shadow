@@ -1,5 +1,4 @@
 from visdom import Visdom
-from scipy.ndimage.filters import gaussian_filter
 import numpy as np
 import torch
 

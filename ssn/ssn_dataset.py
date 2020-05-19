@@ -13,7 +13,7 @@ import random
 import matplotlib.pyplot as plt
 import cv2
 from params import params
-from random_pattern import random_pattern
+from .random_pattern import random_pattern
 
 class To_Normalized_Img(object):
     """Convert PIL image to [0,1] numpy"""
