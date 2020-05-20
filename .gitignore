@@ -16,3 +16,5 @@ data_process/.ipynb_checkpoints/*
 dbg*/*
 dbg*
 *.npy
+GUI/dist/*
+GUI/dist/build/*
