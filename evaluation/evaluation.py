@@ -22,24 +22,23 @@ parser.add_argument('-f', '--file', type=str, help='input model file')
 parser.add_argument('-m', '--mask', type=str, help='mask file')
 parser.add_argument('-i', '--ibl', type=str, help='ibl file')
 parser.add_argument('-o', '--output', type=str, help='output folder')
-parser.add_argument('-w', '--weight', type=str, help='weight of current model', default='../weights/new_pattern_11-May-09-59-PM.pt')
+parser.add_argument('-w', '--weight', type=str, help='weight of current model', default='../weights/group_norm_15-May-07-45-PM.pt')
 parser.add_argument('-v', '--verbose', action='store_true', help='output file name')
 
 options = parser.parse_args()
 print('options: ', options)
 
-device = torch.device("cpu")
-# device = torch.device("cuda:2" if torch.cuda.is_available() else "cpu")
+# device = torch.device("cpu")
+device = torch.device("cuda:2" if torch.cuda.is_available() else "cpu")
 print("Device: ", device)
 model = Relight_SSN(1,1)
 
-# weight_file = options.weight
-# checkpoint = torch.load(weight_file, map_location=device)    
-# model.to(device)
-# model.load_state_dict(checkpoint['model_state_dict'])
+weight_file = options.weight
+checkpoint = torch.load(weight_file, map_location=device)    
+model.to(device)
+model.load_state_dict(checkpoint['model_state_dict'])
 
 to_tensor = ToTensor()
-
 cam_world_dict = {}
 def get_files(folder):
     return [join(folder, f) for f in os.listdir(folder) if os.path.isfile(join(folder, f))]
