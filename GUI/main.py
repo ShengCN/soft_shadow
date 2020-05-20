@@ -50,7 +50,7 @@ class App(QWidget):
         self.add_cur_ibl_state()
 
         # test imgs
-        self.num_test = 3 
+        self.num_test = 4
         self.final_imgs = [join('imgs', '{:03d}_final.png'.format(i)) for i in range(1,self.num_test+1)]
         self.mask_imgs = [join('imgs','{:03d}_mask.png'.format(i)) for i in range(1,self.num_test+1)]
         self.cutout_imgs = [join('imgs','{:03d}_cutout.png'.format(i)) for i in range(1,self.num_test+1)]
@@ -59,14 +59,14 @@ class App(QWidget):
         self.initUI()
     
     def init_ibl_state(self):
-        self.cur_x, self.cur_y, self.cur_size = 0.0, 0.0, 0.1
+        self.cur_x, self.cur_y, self.cur_size, self.cur_scale = 0.0, 0.0, 0.1, 1.0
 
     def reset_ibl_cmds(self):
         self.ibl_cmds = []
         self.init_ibl_state()
 
     def add_cur_ibl_state(self):
-        self.ibl_cmds.append((self.cur_x, self.cur_y, self.cur_size))
+        self.ibl_cmds.append((self.cur_x, self.cur_y, self.cur_size, self.cur_scale))
 
     def initUI(self):
         self.setWindowTitle(self.title)
@@ -121,12 +121,17 @@ class App(QWidget):
             print('increase size')
             self.cur_size += 0.005
             self.cur_size = np.clip(self.cur_size, 0.001, 1.0)
+            if len(self.ibl_cmds) != 0:
+                self.ibl_cmds[-1] = (self.cur_x, self.cur_y, self.cur_size, self.cur_scale)
             self.update_composite()
 
         if event.key() == QtCore.Qt.Key_W:
             print('decrease size')
             self.cur_size -= 0.005
             self.cur_size = np.clip(self.cur_size, 0.001, 1.0)
+            if len(self.ibl_cmds) != 0:
+                self.ibl_cmds[-1] = (self.cur_x, self.cur_y, self.cur_size, self.cur_scale)
+
             self.update_composite()
 
         if event.key() == QtCore.Qt.Key_A:
@@ -134,15 +139,30 @@ class App(QWidget):
             self.add_cur_ibl_state()
             self.init_ibl_state()
             self.update_composite()
+        
+        if event.key() == QtCore.Qt.Key_S:
+            if len(self.ibl_cmds) != 0:
+                self.ibl_cmds[-1] = (self.cur_x, self.cur_y, self.cur_size, self.cur_scale)
+            self.cur_scale += 0.1
+            self.cur_scale = np.clip(self.cur_scale, 0.0, 3.0)
+            print('increase scale the light: {}'.format(self.cur_scale))
+            self.update_composite()
+
+        if event.key() == QtCore.Qt.Key_D:
+            if len(self.ibl_cmds) != 0:
+                self.ibl_cmds[-1] = (self.cur_x, self.cur_y, self.cur_size, self.cur_scale)
+            self.cur_scale -= 0.1
+            self.cur_scale = np.clip(self.cur_scale, 0.0, 3.0)
+            print('decrease scale the light: {}'.format(self.cur_scale))
+            self.update_composite() 
 
     def mouseMoveEvent(self, event):
-        if event.buttons() == QtCore.Qt.NoButton:
-            print("Simple mouse motion")
-        elif event.buttons() == QtCore.Qt.LeftButton:
-            print("Left click drag")
-
-        elif event.buttons() == QtCore.Qt.RightButton:
-            print("Right click drag")
+        if event.buttons() == QtCore.Qt.LeftButton:
+            x,y = self.get_relative_pos(event)
+            self.cur_x, self.cur_y = x, y
+            if len(self.ibl_cmds) != 0:
+                self.ibl_cmds[-1] = (self.cur_x, self.cur_y, self.cur_size, self.cur_scale)
+            self.update_composite()
         super(App, self).mouseMoveEvent(event)
 
     def set_ibl(self, ibl_np):
@@ -154,7 +174,8 @@ class App(QWidget):
         return composite
 
     def update_composite(self):
-        self.ibl_cmds[-1] = (self.cur_x, self.cur_y, self.cur_size)
+        # if len(self.ibl_cmds) != 0:
+        #     self.ibl_cmds[-1] = (self.cur_x, self.cur_y, self.cur_size)
 
         cur_ibl = self.get_cur_ibl()
         self.set_ibl(cur_ibl)
@@ -169,7 +190,15 @@ class App(QWidget):
             print("Press! {}".format(event.pos()))
             x,y = self.get_relative_pos(event)
             self.cur_x, self.cur_y = x, y
+            if len(self.ibl_cmds) != 0:
+                self.ibl_cmds[-1] = (self.cur_x, self.cur_y, self.cur_size, self.cur_scale)
             self.update_composite()
+
+        if event.button() == QtCore.Qt.RightButton:
+            print('Delete last IBL')
+            if len(self.ibl_cmds) != 0:
+                self.ibl_cmds = self.ibl_cmds[:-1]
+                self.update_composite() 
 
         super(App, self).mousePressEvent(event)
 
@@ -184,11 +213,12 @@ class App(QWidget):
 
     def get_cur_ibl(self):
         num = len(self.ibl_cmds)
-
+        if num == 0:
+            return np.zeros((256,512,3))
         gs = ig.Composite(operator=np.add,
                 generators=[ig.Gaussian(
                             size=self.ibl_cmds[i][2],
-                            scale=1.0,
+                            scale=self.ibl_cmds[i][3],
                             x=self.ibl_cmds[i][0]-0.5,
                             y=self.ibl_cmds[i][1]-0.5,
                             aspect_ratio=1.0,
