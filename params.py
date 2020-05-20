@@ -18,6 +18,7 @@ class params():
             self.cpu = True
             self.flip = True
             self.psp = False
+            self.ds_folder = './dataset/new_dataset'
 
         def set_params(self, options):
             self.options = options
@@ -34,6 +35,7 @@ class params():
             self.cpu = options.cpu
             self.flip = options.flip
             self.psp = options.psp
+            self.ds_folder = options.ds_folder
 
         def __str__(self):
             return 'norm: {}  prelu: {} weight decay: {} small ds: {}'.format(self.norm, self.prelu, self.weight_decay, self.small_ds)
@@ -79,6 +81,7 @@ def parse_params():
     parser.add_argument('--cpu', action='store_true', help='Force training on CPU')
     parser.add_argument('--flip', action='store_true', help='Flipping shadow values')
     parser.add_argument('--psp', action='store_true', help='PSP bottleneck')
+    parser.add_argument('--ds_folder', type=str, default='./dataset/new_dataset', help='Dataset folder')
 
     arguments = parser.parse_args()
     parameter = params()

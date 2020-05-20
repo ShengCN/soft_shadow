@@ -195,7 +195,8 @@ def train(params):
 
     # dataset
     # ds_csv = "/home/ysheng/Dataset/new_dataset/meta_data.csv"
-    ds_folder = './dataset/new_dataset'
+    # ds_folder = './dataset/new_dataset'
+    ds_folder = params.ds_folder
     train_set = SSN_Dataset(ds_folder, True)
     train_dataloder = DataLoader(train_set, batch_size= min(len(train_set), params.batch_size), shuffle=True, num_workers=params.workers, drop_last=True)
     valid_set = SSN_Dataset(ds_folder, False)
