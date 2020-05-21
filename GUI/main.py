@@ -4,7 +4,8 @@ sys.path.append("..")
 import os
 from os.path import join
 from PyQt5 import QtWidgets, QtCore
-from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QPushButton
+from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QPushButton, QSlider, QGridLayout, QGroupBox, QListWidget
 from PyQt5.QtGui import QIcon, QPixmap, QImage  
 import numpy as np
 import matplotlib.pyplot as plt
@@ -35,15 +36,48 @@ class App(QWidget):
         self.next_btn.move(256 * 4, 0)
         self.next_btn.clicked.connect(self.next_scene)
 
-        self.layout = QtWidgets.QHBoxLayout()
-        self.layout.addWidget(self.template_label)
-        self.layout.addWidget(self.cutout_label)
-        self.layout.addWidget(self.ibl_label)
-        self.layout.addWidget(self.next_btn)
+        # light list
+        self.light_list = QListWidget()
 
-        self.setLayout(self.layout)
+        # size slider
+        self.size_slider_label = QLabel(self)
+        self.size_slider_label.setText('light size')
+        self.size_slider = QSlider(Qt.Horizontal)
+        self.size_slider.setSingleStep(1)
+        self.size_slider.valueChanged.connect(self.size_change)
+
+        # scale slider
+        self.scale_slider_label = QLabel(self)
+        self.scale_slider_label.setText('scale size')
+        self.scale_slider = QSlider(Qt.Horizontal)
+        self.scale_slider.setSingleStep(1)
+        self.scale_slider.valueChanged.connect(self.scale_change)
+
+        label_group = QGroupBox("Composite")
+        self.hlayout = QtWidgets.QHBoxLayout()
+        self.hlayout.addWidget(self.template_label)
+        self.hlayout.addWidget(self.cutout_label)
+        self.hlayout.addWidget(self.ibl_label)
+        label_group.setLayout(self.hlayout)
+
+        button_group = QGroupBox("Light control")
+        self.vlayout = QtWidgets.QVBoxLayout()
+        self.vlayout.addWidget(self.light_list)
+        self.vlayout.addWidget(self.size_slider_label)
+        self.vlayout.addWidget(self.size_slider)
+        self.vlayout.addWidget(self.scale_slider_label)
+        self.vlayout.addWidget(self.scale_slider)
+        self.vlayout.addWidget(self.next_btn)
+        button_group.setLayout(self.vlayout)
+
+        grid = QGridLayout()
+        grid.addWidget(label_group, 0, 0)
+        grid.addWidget(button_group, 0, 1)
+        self.setLayout(grid)
 
         self.cur_ibl = np.zeros((256,512,3))
+        self.cur_size_min, self.cur_size_max = 0.05, 0.2
+        self.cur_scale_min, self.cur_scale_max = 0.0, 3.0
 
         self.ibl_cmds = []
         self.init_ibl_state()
@@ -57,9 +91,17 @@ class App(QWidget):
         self.cur_exp = 0
 
         self.initUI()
-    
+
     def init_ibl_state(self):
         self.cur_x, self.cur_y, self.cur_size, self.cur_scale = 0.0, 0.0, 0.1, 1.0
+        self.update_slider()
+
+    def update_slider(self):
+        size_factor = (self.cur_size - self.cur_size_min)/(self.cur_size_max - self.cur_size_min)
+        scale_factor = (self.cur_scale - self.cur_scale_min)/(self.cur_scale_max-self.cur_scale_min)
+
+        self.scale_slider.setValue(scale_factor * 99.0)
+        self.size_slider.setValue(size_factor * 99.0)
 
     def reset_ibl_cmds(self):
         self.ibl_cmds = []
@@ -72,6 +114,8 @@ class App(QWidget):
         self.setWindowTitle(self.title)
         self.setGeometry(self.left, self.top, self.width, self.height)
         self.update_cur_labels()
+        self.setFixedSize(self.width, self.height)
+
         self.show()
 
     def set_image(self, label, img_path):
@@ -109,52 +153,44 @@ class App(QWidget):
         self.cur_exp = self.cur_exp % self.num_test
         print(self.cur_exp)
         self.update_cur_labels()
+        self.ibl_cmds = []
+        self.init_ibl_state()
 
     def load_cur_np(self, cur_exp):
         final, cutout, mask = cv2.imread(self.final_imgs[cur_exp]), cv2.imread(self.cutout_imgs[cur_exp]), cv2.imread(self.mask_imgs[cur_exp])
         return final, cutout, mask
+    
+    def lerp(self, a, b, f):
+        return (1.0-f) * a + f * b
 
-    def keyPressEvent(self, event):
-        if event.key() == QtCore.Qt.Key_Escape:
-            self.close()
-        if event.key() == QtCore.Qt.Key_Q:
-            print('increase size')
-            self.cur_size += 0.005
-            self.cur_size = np.clip(self.cur_size, 0.001, 1.0)
-            if len(self.ibl_cmds) != 0:
-                self.ibl_cmds[-1] = (self.cur_x, self.cur_y, self.cur_size, self.cur_scale)
+    def size_change(self):
+        fract = self.size_slider.value()/99.0
+        self.cur_size = self.lerp(self.cur_size_min, self.cur_size_max, fract)
+
+        # print('size value: ', )
+        # self.cur_size = np.clip(self.cur_size, 0.001, 1.0)
+        if len(self.ibl_cmds) != 0:
+            self.ibl_cmds[-1] = (self.cur_x, self.cur_y, self.cur_size, self.cur_scale)
             self.update_composite()
 
-        if event.key() == QtCore.Qt.Key_W:
-            print('decrease size')
-            self.cur_size -= 0.005
-            self.cur_size = np.clip(self.cur_size, 0.001, 1.0)
-            if len(self.ibl_cmds) != 0:
-                self.ibl_cmds[-1] = (self.cur_x, self.cur_y, self.cur_size, self.cur_scale)
+        self.ibl_label.setFocus()
 
+    def scale_change(self):
+        fract = self.scale_slider.value()/99.0
+        self.cur_scale = self.lerp(self.cur_scale_min, self.cur_scale_max, fract)
+
+        if len(self.ibl_cmds) != 0:
+            self.ibl_cmds[-1] = (self.cur_x, self.cur_y, self.cur_size, self.cur_scale)
             self.update_composite()
 
+        self.ibl_label.setFocus()
+
+    def keyPressEvent(self, event):      
         if event.key() == QtCore.Qt.Key_A:
             print('add an area light')
             self.add_cur_ibl_state()
             self.init_ibl_state()
             self.update_composite()
-        
-        if event.key() == QtCore.Qt.Key_S:
-            if len(self.ibl_cmds) != 0:
-                self.ibl_cmds[-1] = (self.cur_x, self.cur_y, self.cur_size, self.cur_scale)
-            self.cur_scale += 0.1
-            self.cur_scale = np.clip(self.cur_scale, 0.0, 3.0)
-            print('increase scale the light: {}'.format(self.cur_scale))
-            self.update_composite()
-
-        if event.key() == QtCore.Qt.Key_D:
-            if len(self.ibl_cmds) != 0:
-                self.ibl_cmds[-1] = (self.cur_x, self.cur_y, self.cur_size, self.cur_scale)
-            self.cur_scale -= 0.1
-            self.cur_scale = np.clip(self.cur_scale, 0.0, 3.0)
-            print('decrease scale the light: {}'.format(self.cur_scale))
-            self.update_composite() 
 
     def mouseMoveEvent(self, event):
         if event.buttons() == QtCore.Qt.LeftButton:
@@ -163,6 +199,7 @@ class App(QWidget):
             if len(self.ibl_cmds) != 0:
                 self.ibl_cmds[-1] = (self.cur_x, self.cur_y, self.cur_size, self.cur_scale)
             self.update_composite()
+        self.ibl_label.setFocus()
         super(App, self).mouseMoveEvent(event)
 
     def set_ibl(self, ibl_np):
@@ -179,9 +216,11 @@ class App(QWidget):
 
         cur_ibl = self.get_cur_ibl()
         self.set_ibl(cur_ibl)
-
-        shadow_result = evaluation.net_render_np(self.cur_mask, cur_ibl)
-        shadow_result = np.repeat(shadow_result[:,:,np.newaxis], 3, axis=2)
+        if np.sum(cur_ibl) < 1e-3:
+            shadow_result = np.zeros((256,256,3))
+        else:
+            shadow_result = evaluation.net_render_np(self.cur_mask, cur_ibl)
+            shadow_result = np.repeat(shadow_result[:,:,np.newaxis], 3, axis=2)
         final_composite = self.composite(self.cur_final/255.0, self.cur_mask/255.0, shadow_result)
         self.set_np_img(self.cutout_label, final_composite)
 
@@ -190,9 +229,12 @@ class App(QWidget):
             print("Press! {}".format(event.pos()))
             x,y = self.get_relative_pos(event)
             self.cur_x, self.cur_y = x, y
+            if self.cur_x <= 0.0 or self.cur_x >=1.0 or self.cur_y <= 0.0 or self.cur_y >=1.0:
+                return
+
             if len(self.ibl_cmds) != 0:
                 self.ibl_cmds[-1] = (self.cur_x, self.cur_y, self.cur_size, self.cur_scale)
-            self.update_composite()
+                self.update_composite()
 
         if event.button() == QtCore.Qt.RightButton:
             print('Delete last IBL')
