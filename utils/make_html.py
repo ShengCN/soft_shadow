@@ -77,29 +77,44 @@ def eval_gen(webpage, output_folder, is_pattern=True):
 vis_pattern_folder = '/home/ysheng/Documents/vis_pattern'
 vis_real_folder = '/home/ysheng/Documents/vis_real'
 def vis_files_in_folder():
-    webpage = html.HTML(vis_pattern_folder, 'pattern evaluation', reflesh=1)    
-    eval_gen(webpage, vis_pattern_folder)
-    webpage.save()
-
-    webpage = html.HTML(vis_real_folder, 'real evaluation', reflesh=1)    
-    eval_gen(webpage, vis_real_folder, False)
-    webpage.save()
-
-    print('finished')
-
+    folder = '/home/ysheng/Documents/vis_models'
+    webpage = html.HTML(folder, 'models', reflesh=1)    
+    img_folders = join(folder, 'imgs')
+    files = get_files(img_folders)
+    print("There are {} files".format(len(files)))
     
+    prefix_set = set()
+    for cur_file in tqdm(files):
+        cur_name = os.path.splitext(os.path.basename(cur_file))[0]
+        prefix_set.add(cur_name[:-3])
+
+    print('there are {} prefixs'.format(len(prefix_set)))
+    prefix_set = list(prefix_set)
+    prefix_set.sort()
+
+    # import pdb; pdb.set_trace()
+    relative_folder = './imgs'
+    for i, prefix in enumerate(prefix_set):
+        ims = [join(relative_folder, prefix + '{:03d}.png'.format(i)) for i in range(len(files) // len(prefix_set))]
+        txts = [prefix + '{:03d}'.format(i) for i in range(len(files) // len(prefix_set))]
+        links = ims
+        webpage.add_images(ims, txts, links)
+
+    webpage.save()
+    print('finished')
     
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='evaluatoin pipeline')
-    parser.add_argument('-p','--pattern', action='store_true', help='pattern?')
+    # parser = argparse.ArgumentParser(description='evaluatoin pipeline')
+    # parser.add_argument('-p','--pattern', action='store_true', help='pattern?')
 
-    options = parser.parse_args()
+    # options = parser.parse_args()
 
-    if options.pattern:
-        webpage = html.HTML(vis_pattern_folder, 'pattern evaluation', reflesh=1)    
-        eval_gen(webpage, vis_pattern_folder)
-        webpage.save()
-    else:
-        webpage = html.HTML(vis_real_folder, 'real evaluation', reflesh=1)    
-        eval_gen(webpage, vis_real_folder, False)
-        webpage.save()
+    # if options.pattern:
+    #     webpage = html.HTML(vis_pattern_folder, 'pattern evaluation', reflesh=1)    
+    #     eval_gen(webpage, vis_pattern_folder)
+    #     webpage.save()
+    # else:
+    #     webpage = html.HTML(vis_real_folder, 'real evaluation', reflesh=1)    
+    #     eval_gen(webpage, vis_real_folder, False)
+    #     webpage.save()
+    vis_files_in_folder()

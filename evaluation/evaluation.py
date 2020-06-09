@@ -29,7 +29,7 @@ options = parser.parse_args()
 print('options: ', options)
 
 # device = torch.device("cpu")
-device = torch.device("cuda:2" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print("Device: ", device)
 model = Relight_SSN(1,1)
 weight_file = options.weight
@@ -106,7 +106,7 @@ def to_net_ibl(ibl_file):
 
     ibl = imageio.imread(ibl_file)
     if np.uint8 == ibl.dtype:
-       ibl = ibl / 255.0
+        ibl = ibl / 255.0
 
     if len(ibl.shape) == 3:
         ibl = ibl[:5,:,0] + ibl[:5,:,1] + ibl[:5,:,2]
@@ -238,6 +238,7 @@ def net_gt(mask_file, ibl_file, out_file):
 
     return shadow
 
+
 def net_render(mask_file, ibl_file, out_file, save_npy=True):
     s = time.time()
     net_ibl = to_net_ibl(ibl_file)
@@ -303,18 +304,35 @@ def evaluate(mask_file, ibl_file, output, real_ibl=True):
 
 
 if __name__ == '__main__':
-    # evaluate(options.file, options.mask, options.ibl, options.output)
-    model_file = '/Data_SSD/models/notsimulated_combine_male_short_outfits_genesis8_armani_casualoutfit03_Base_Pose_Standing_A/notsimulated_combine_male_short_outfits_genesis8_armani_casualoutfit03_Base_Pose_Standing_A.obj'
-    mask_file = '/Data_SSD/new_dataset/cache/mask/notsimulated_combine_male_short_outfits_genesis8_armani_casualoutfit03_Base_Pose_Standing_A/pitch_15_rot_0_mask.npy'
-    # ibl_file = '/home/ysheng/Dataset/ibls/real/20060430-01_hd.hdr'
+    # # evaluate(options.file, options.mask, options.ibl, options.output)
+    # model_file = '/Data_SSD/models/notsimulated_combine_male_short_outfits_genesis8_armani_casualoutfit03_Base_Pose_Standing_A/notsimulated_combine_male_short_outfits_genesis8_armani_casualoutfit03_Base_Pose_Standing_A.obj'
+    # mask_file = '/Data_SSD/new_dataset/cache/mask/notsimulated_combine_male_short_outfits_genesis8_armani_casualoutfit03_Base_Pose_Standing_A/pitch_15_rot_0_mask.npy'
+    # # ibl_file = '/home/ysheng/Dataset/ibls/real/20060430-01_hd.hdr'
+    # # ibl_file = '../test_pattern.png'
+    
+
     # ibl_file = '../test_pattern.png'
+
+    # # model_file = '/home/ysheng/Dataset/models/simulated_combine_female_short_outfits_audrey_blair_summertimefull_Base_Pose_Standing_A/simulated_combine_female_short_outfits_audrey_blair_summertimefull_Base_Pose_Standing_A.obj'
+    # mask_file = '/home/ysheng/Dataset/new_dataset/cache/mask/simulated_combine_female_long_fullbody_bridget8_wildwind_ssradclosedrobe_CDIG8Female_StandH/pitch_35_rot_0_mask.npy'
+    # ibl_file = '/home/ysheng/Dataset/ibls/pattern/num_6_size_0.08_ibl.png'
+    # output = '/home/ysheng/Dataset/evaluation/simulated_combine_female_short_outfits_audrey_blair_summertimefull_Base_Pose_Standing_A/num_6_size_0.08_ibl'
+    # evaluate(mask_file, ibl_file, output, False)
     
     output = 'dbg/'
     os.makedirs(output, exist_ok=True)
-    ibl_file = '../test_pattern.png'
+    mask_file = '/Data_SSD/new_dataset/cache/mask/simulated_combine_female_short_outfits_audrey_blair_summertimefull_Base_Pose_Standing_A/pitch_15_rot_0_mask.png'
+    shutil.copy(mask_file, 'dbg')
+    ibl_file = 'paper/eg/1_ibl.png'
+    # ibl_files = ['paper/render/1_ibl.png', 'paper/render/2_ibl.png', 'paper/render/multi_ibl.png']
+    ibl_files = ['paper/render/018.png']
+    for ibl_file in ibl_files:
+        name = os.path.splitext(os.path.basename(ibl_file))[0]    
+        out_name = join(output, name + "_net_gt.png")
+        out_ibl = join(output, os.path.basename(ibl_file))
+        shutil.copy(ibl_file, out_ibl)
 
-    # model_file = '/home/ysheng/Dataset/models/simulated_combine_female_short_outfits_audrey_blair_summertimefull_Base_Pose_Standing_A/simulated_combine_female_short_outfits_audrey_blair_summertimefull_Base_Pose_Standing_A.obj'
-    mask_file = '/home/ysheng/Dataset/new_dataset/cache/mask/simulated_combine_female_long_fullbody_bridget8_wildwind_ssradclosedrobe_CDIG8Female_StandH/pitch_35_rot_0_mask.npy'
-    ibl_file = '/home/ysheng/Dataset/ibls/pattern/num_6_size_0.08_ibl.png'
-    output = '/home/ysheng/Dataset/evaluation/simulated_combine_female_short_outfits_audrey_blair_summertimefull_Base_Pose_Standing_A/num_6_size_0.08_ibl'
-    evaluate(mask_file, ibl_file, output, False)
+        final_out_file = join(output, name + "_final.png")
+        shadow_out_file = join(output, name + "_mts_shadow.png")
+        mitsuba_render(mask_file, ibl_file, final_out_file, shadow_out_file, final=True, update_cam_param=False, real_ibl=False, write_cmd=False, skip=False)
+        net_gt(mask_file, ibl_file, out_name)
