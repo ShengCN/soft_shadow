@@ -68,7 +68,7 @@ def parse_params():
     parser.add_argument('--prelu', action='store_true', help='use group norm')
     parser.add_argument('--small_ds', action='store_true', help='small dataset')
     parser.add_argument('--log', action='store_true', help='log information')
-    parser.add_argument('--vis_port', type=int, help='visdom port')
+    parser.add_argument('--vis_port', default=8002,type=int, help='visdom port')
     parser.add_argument('--weight_decay', type=float, default=4e-5, help='weight decay for model weight')
     parser.add_argument('--save', action='store_true', help='save batch results?')
     parser.add_argument('--need_train', action='store_true', help='save batch results?')

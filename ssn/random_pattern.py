@@ -27,9 +27,10 @@ class random_pattern():
             seed = seed + int(time.time())
 
         if num == 0:
-            return np.zeros((80,512))
+            return np.zeros((256,512))
 
-        factor = 80/256
+        # factor = 80/256
+        factor = 1.0
         gs = ig.Composite(operator=np.add,
                         generators=[ig.Gaussian(
                                     size=size*ng.UniformRandom(seed=seed+i+4),
@@ -41,7 +42,7 @@ class random_pattern():
                                     ) for i in range(num)],
                             position=(0, 0), 
                             xdensity=512)
-        ibl = self.normalize(gs()[80:160,:], energy) 
+        ibl = self.normalize(gs(), energy) 
 
         if mitsuba:
             return ibl, self.to_mts_ibl(np.copy(ibl))
@@ -50,20 +51,15 @@ class random_pattern():
 
 
     def to_mts_ibl(self, ibl):
-        """ Input: 80 x 512 pattern generated ibl 
+        """ Input: 256 x 512 pattern generated ibl 
             Output: the ibl in mitsuba ibl
         """
-        cur_ibl = np.repeat(ibl[:,:,np.newaxis], 3, axis=2)
-        ret_ibl = np.zeros((256,512, 3))
-        ret_ibl[:80,:, :] = cur_ibl
-        return ret_ibl
+        return np.repeat(ibl[:,:,np.newaxis], 3, axis=2)
 
     def normalize(self, ibl, energy=3500):
         total_energy = np.sum(ibl)
         if total_energy < 1e-3:
             print('small energy: ', total_energy)
-            return np.zeros((80,512))
-
-        ibl = ibl * energy / total_energy
-
-        return ibl
+            return np.zeros((256,512))
+        
+        return ibl * energy / total_energy

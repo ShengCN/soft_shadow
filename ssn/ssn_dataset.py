@@ -15,15 +15,6 @@ import cv2
 from params import params
 from .random_pattern import random_pattern
 
-class To_Normalized_Img(object):
-    """Convert PIL image to [0,1] numpy"""
-
-    def __call__(self, img):
-        img = np.array(img)
-        if img.dtype == np.uint8:
-            img = img/255.0
-        return img
-
 class ToTensor(object):
     """Convert ndarrays in sample to Tensors."""
 
@@ -35,27 +26,6 @@ class ToTensor(object):
             img = img.transpose((2, 0, 1))
         return torch.Tensor(img)
 
-class IBL_Transform(object):
-    """ IBL transforms before training"""
-
-    # input is PIL img, output is numpy
-    def __call__(self, img):
-        normalize_transform = To_Normalized_Img()
-        img = normalize_transform(img)
-        
-        return img[:,:,1:2]
-
-class Mask_Transform(object):
-    """ Mask transforms before training
-        Input: PIL image
-        Output: numpy
-    """
-    def __call__(self, img):
-        normalize_transform = To_Normalized_Img()
-        img = normalize_transform(img)
-        h,w,c = img.shape
-        return img[:,:,0:1]
-    
 class SSN_Dataset(Dataset):
     def __init__(self, ds_dir, is_training):
         start = time.time()
@@ -65,13 +35,12 @@ class SSN_Dataset(Dataset):
         self.ibl_group_size = 16
         
         parameter = params().get_params()
-        # self.meta_data = pd.read_csv(csv_meta_file, header=None).to_numpy()
+
+        # (shadow_path, mask_path)
         self.meta_data = self.init_meta(ds_dir)
 
         self.is_training = is_training
         self.to_tensor = ToTensor()
-        self.mask_transfrom = Mask_Transform()
-        self.ibl_transform = IBL_Transform()
         
         end = time.time()
         print("Dataset initialize spent: {} ms".format(end - start))
@@ -108,42 +77,27 @@ class SSN_Dataset(Dataset):
         if not self.is_training:
             idx = self.training_num + idx
         
-        is_log = False
-        if idx % 10 == 0 and self.thread_id == os.getpid() and self.need_log:
-            is_log = True
-        
         cur_seed = idx * 1234 + os.getpid() + time.time()
         random.seed(cur_seed)
+        
         # random ibls
-        if is_log:
-            s = time.time()
         shadow_path, mask_path = self.meta_data[idx]  
         mask_img = plt.imread(mask_path)
         mask_img = mask_img[:,:,0]
         if mask_img.dtype == np.uint8:
             mask_img = mask_img/ 255.0
 
-        mask_img, shadow_bases = np.expand_dims(mask_img, axis=2), np.load(shadow_path)
-        if is_log:
-            elapsed = time.time() - s
-            log_info = '{} loading file time: {} \n'.format(idx, elapsed)
-
-        if is_log:
-            s = time.time()  
+        mask_img, shadow_bases = np.expand_dims(mask_img, axis=2), 1.0 - np.load(shadow_path)
+       
         shadow_img, light_img = self.render_new_shadow(shadow_bases, cur_seed)
-        if is_log:
-            elapsed = time.time() - s
-            log_info += '{} rendering file time: {} \n'.format(idx, elapsed)
-            self.log(log_info)
-            
-#         print('mask: {}, shadow: {}, light: {}'.format(mask_img.shape, shadow_img.shape, light_img.shape))
+        
         mask_img, shadow_img, light_img = self.to_tensor(mask_img), self.to_tensor(shadow_img),self.to_tensor(light_img)
         
         return mask_img, light_img, shadow_img
     
     def init_meta(self, ds_dir):
         base_folder = join(ds_dir, 'base')
-        mask_folder = join(ds_dir, 'cache/mask')
+        mask_folder = join(ds_dir, 'mask')
         model_list = [f for f in os.listdir(base_folder) if os.path.isdir(join(base_folder, f))]
         metadata = []
         for m in model_list:
@@ -168,11 +122,7 @@ class SSN_Dataset(Dataset):
     
     def render_new_shadow(self, shadow_bases, seed):
         h, w, iw, ih = shadow_bases.shape
-        # is_bias = random.random() < 0.5
-        # if is_bias:
-        #     low, high = 0, 6
-        # else:
-        #     low, high = 0, 50
+        
         num = random.randint(0, 50)
         pattern_img = self.random_pattern_generator.get_pattern(num=num, size=0.1, mitsuba=False, seed=int(seed))
         

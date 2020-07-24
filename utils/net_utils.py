@@ -46,7 +46,7 @@ def save_model(output_folder, model, optimizer, epoch, best_loss, exp_name, hist
     output_fname = os.path.join(output_folder, exp_name + '_' + cur_time_stamp + ".pt")
 
     tmp_model = model
-    if params.multi_gpu:
+    if params.multi_gpu and hasattr(tmp_model, 'module'):
         tmp_model = model.module
 
     torch.save({
