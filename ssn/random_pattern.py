@@ -20,29 +20,33 @@ class random_pattern():
         # y = []
         pass
 
-    def get_pattern(self, num=50, scale=3.0, size=0.1, energy=3500, mitsuba=False, seed=None):
+    def get_pattern(self, w, h, num=50, scale=3.0, size=0.1, energy=3500, mitsuba=False, seed=None, dataset=False):
         if seed is None:
             seed = random.randint(0,19920208)
         else:
             seed = seed + int(time.time())
 
         if num == 0:
-            return np.zeros((256,512))
-
-        # factor = 80/256
-        factor = 1.0
-        gs = ig.Composite(operator=np.add,
-                        generators=[ig.Gaussian(
-                                    size=size*ng.UniformRandom(seed=seed+i+4),
-                                    scale=scale*(ng.UniformRandom(seed=seed+i+5)+1e-3),
-                                    x=ng.UniformRandom(seed=seed+i+1)-0.5,
-                                    y=(ng.UniformRandom(seed=seed+i+2)-0.5)*factor,
-                                    aspect_ratio=0.7,
-                                    orientation=np.pi*ng.UniformRandom(seed=seed+i+3),
-                                    ) for i in range(num)],
-                            position=(0, 0), 
-                            xdensity=512)
-        ibl = self.normalize(gs(), energy) 
+            ibl = np.zeros((256,512))
+        else:
+            # factor = 80/256
+            factor = 1.0
+            gs = ig.Composite(operator=np.add,
+                            generators=[ig.Gaussian(
+                                        size=size*ng.UniformRandom(seed=seed+i+4),
+                                        scale=scale*(ng.UniformRandom(seed=seed+i+5)+1e-3),
+                                        x=ng.UniformRandom(seed=seed+i+1)-0.5,
+                                        y=(ng.UniformRandom(seed=seed+i+2)-0.5)*factor,
+                                        aspect_ratio=0.7,
+                                        orientation=np.pi*ng.UniformRandom(seed=seed+i+3),
+                                        ) for i in range(num)],
+                                position=(0, 0), 
+                                xdensity=512)
+            ibl = self.normalize(gs(), energy) 
+        
+        # prepare to fix energy inconsistent
+        if dataset:
+            ibl = self.to_dataset(ibl, w, h)
 
         if mitsuba:
             return ibl, self.to_mts_ibl(np.copy(ibl))
@@ -56,10 +60,14 @@ class random_pattern():
         """
         return np.repeat(ibl[:,:,np.newaxis], 3, axis=2)
 
-    def normalize(self, ibl, energy=3500):
+    def normalize(self, ibl, energy=30.0):
         total_energy = np.sum(ibl)
         if total_energy < 1e-3:
             print('small energy: ', total_energy)
-            return np.zeros((256,512))
+            h,w = ibl.shape
+            return np.zeros((h,w))
         
         return ibl * energy / total_energy
+
+    def to_dataset(self, ibl, w, h):
+        return self.normalize(cv2.flip(cv2.resize(ibl, (w, h)), 0), 30)

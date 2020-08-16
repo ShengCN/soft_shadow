@@ -5,18 +5,19 @@ class params():
     
     class __params():
         def __init__(self):
-            self.norm = 'group_norm'
+            self.norm = 'batch_norm'
             self.prelu = False
             self.weight_decay = 5e-4
             self.small_ds = False
             self.multi_gpu = False
-            self.log = True
+            self.log = False
             self.coordconv = False
             self.baseline = True
             self.vis_port = 8002
             self.need_train = True
-            self.cpu = True
+            self.cpu = False
             self.psp = False
+            self.sketch = False
 
         def set_params(self, options):
             self.options = options
@@ -32,6 +33,8 @@ class params():
             self.need_train = options.need_train
             self.cpu = options.cpu
             self.psp = options.psp
+            self.ds_folder = options.ds_folder
+            self.sketch = options.sketch
             
         def __str__(self):
             return 'norm: {}  prelu: {} weight decay: {} small ds: {}'.format(self.norm, self.prelu, self.weight_decay, self.small_ds)
@@ -65,7 +68,8 @@ def parse_params():
     parser.add_argument('--patience', type=int, default=2, help='use automatic schedule')
     parser.add_argument('--exp_name', type=str, default='l1 loss',help='experiment name')    
     parser.add_argument('--norm', type=str, default='batch_norm', help='use group norm')
-    parser.add_argument('--prelu', action='store_true', help='use group norm')
+    parser.add_argument('--ds_folder', type=str, default='./dataset/general_dataset', help='Dataset folder')
+    parser.add_argument('--prelu', action='store_true', help='use prelu')
     parser.add_argument('--small_ds', action='store_true', help='small dataset')
     parser.add_argument('--log', action='store_true', help='log information')
     parser.add_argument('--vis_port', default=8002,type=int, help='visdom port')
@@ -76,6 +80,7 @@ def parse_params():
     parser.add_argument('--coordconv', action='store_true', help='use coord convolution')
     parser.add_argument('--cpu', action='store_true', help='Force training on CPU')
     parser.add_argument('--psp', action='store_true', help='PSP bottleneck')
+    parser.add_argument('--sketch', action='store_true', help='Use sketch')
 
     arguments = parser.parse_args()
     parameter = params()

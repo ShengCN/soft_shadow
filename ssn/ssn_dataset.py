@@ -48,16 +48,18 @@ class SSN_Dataset(Dataset):
         # fake random
         np.random.seed(19950220)
         np.random.shuffle(self.meta_data)
-        self.training_num = len(self.meta_data) - len(self.meta_data) // 10
-        print('training: {}, validation: {}'.format(self.training_num, self.training_num//10))
         
+        self.valid_divide = 10
         if parameter.small_ds:
-            self.training_num = self.training_num//20
+            self.meta_data = self.meta_data[:len(self.meta_data)//self.valid_divide]
+
+        self.training_num = len(self.meta_data) - len(self.meta_data) // self.valid_divide
+        print('training: {}, validation: {}'.format(self.training_num, len(self.meta_data) // self.valid_divide))
         
         self.random_pattern_generator = random_pattern()
         
+        self.sketch = parameter.sketch
         self.thread_id = os.getpid()
-        self.need_log = parameter.log
         self.seed = os.getpid()
 
     def __len__(self):
@@ -65,10 +67,7 @@ class SSN_Dataset(Dataset):
             return self.training_num
         else:
             # return len(self.meta_data) - self.training_num
-            return self.training_num//10
-
-        # exp_one_data
-        # return 1
+            return len(self.meta_data) // self.valid_divide
 
     def __getitem__(self, idx):
         if self.is_training and idx > self.training_num:
@@ -81,7 +80,7 @@ class SSN_Dataset(Dataset):
         random.seed(cur_seed)
         
         # random ibls
-        shadow_path, mask_path = self.meta_data[idx]  
+        shadow_path, mask_path, sketch_path = self.meta_data[idx]  
         mask_img = plt.imread(mask_path)
         mask_img = mask_img[:,:,0]
         if mask_img.dtype == np.uint8:
@@ -92,12 +91,24 @@ class SSN_Dataset(Dataset):
         shadow_img, light_img = self.render_new_shadow(shadow_bases, cur_seed)
         
         mask_img, shadow_img, light_img = self.to_tensor(mask_img), self.to_tensor(shadow_img),self.to_tensor(light_img)
+
+        if self.sketch:
+            sketch_img = plt.imread(sketch_path)
+            if sketch_img.dtype == np.uint8:
+                sketch_img = sketch_img/ 255.0
+            sketch_img = sketch_img[:,:,0] + sketch_img[:,:,1] + sketch_img[:,:,2]
+            sketch_img = sketch_img/np.max(sketch_img)
+            sketch_img = sketch_img[:,:,np.newaxis]
+
+            sketch_img = self.to_tensor(sketch_img)
+            return mask_img, light_img, shadow_img, sketch_img
         
         return mask_img, light_img, shadow_img
     
     def init_meta(self, ds_dir):
         base_folder = join(ds_dir, 'base')
         mask_folder = join(ds_dir, 'mask')
+        sketch_folder = join(ds_dir, 'sketch')
         model_list = [f for f in os.listdir(base_folder) if os.path.isdir(join(base_folder, f))]
         metadata = []
         for m in model_list:
@@ -105,7 +116,7 @@ class SSN_Dataset(Dataset):
             shadows = [f for f in os.listdir(shadow_folder) if f.find('_shadow.npy')!=-1]
             for s in shadows:
                 prefix = s[:s.find('_shadow')]
-                metadata.append((join(shadow_folder, s), join(cur_mask_folder, prefix + '_mask.png')))
+                metadata.append((join(shadow_folder, s), join(cur_mask_folder, prefix + '_mask.png'), join(join(sketch_folder, m), prefix + '_sketch.png')))
         
         return metadata
 
@@ -114,17 +125,11 @@ class SSN_Dataset(Dataset):
         basename = os.path.basename(path)
         return os.path.join(folder, basename[:basename.find('_')])
     
-    def statistics(self, key):
-        self.stats_keys[key] += 1
-
-    def get_statistics(self):
-        return self.stats_keys
-    
     def render_new_shadow(self, shadow_bases, seed):
         h, w, iw, ih = shadow_bases.shape
         
         num = random.randint(0, 50)
-        pattern_img = self.random_pattern_generator.get_pattern(num=num, size=0.1, mitsuba=False, seed=int(seed))
+        pattern_img = self.random_pattern_generator.get_pattern(iw, ih, num=num, size=0.1, mitsuba=False, seed=int(seed))
         
         # flip to mitsuba ibl
         pattern_img = self.normalize_energy(cv2.flip(cv2.resize(pattern_img, (iw, ih)), 0))

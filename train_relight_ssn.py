@@ -98,17 +98,22 @@ def training_iteration(model, train_dataloder, optimizer, train_loss, epoch_num)
         t.set_description("Ep. {}".format(epoch_num))
 
         for j in range(params.timers):
-            for i, (mask, light, shadow) in enumerate(train_dataloder):
+            for i, gt_data in enumerate(train_dataloder):
+                mask, light, shadow = gt_data[0], gt_data[1], gt_data[2]
                 I_s, L_t, I_t = mask.to(device), light.to(device), shadow.to(device)
+                img_input = I_s
 
-                # import pdb; pdb.set_trace()
+                if params.sketch:
+                    sketch = gt_data[3].to(device)
+                    img_input = torch.cat([I_s, sketch], dim=1) 
 
                 optimizer.zero_grad()
                 
                 # predict
-                predicted_img, predicted_src_light = model(I_s, L_t)
+                predicted_img, predicted_src_light = model(img_input, L_t)
 
                 # compute loss
+                import pdb; pdb.set_trace()
                 loss = reconstruct_loss(I_t, predicted_img)
 
                 loss.backward()
@@ -143,13 +148,17 @@ def validation_iteration(model, valid_dataloader, valid_loss, epoch_num):
         with tqdm(total=len(valid_dataloader) * params.timers) as t:
             t.set_description("(Validation)Ep. {} ".format(epoch_num))
             for j in range(cur_timer):
-                for i, (mask, light, shadow) in enumerate(valid_dataloader):
-                    I_s = mask.to(device)
-                    L_t = light.to(device)
-                    I_t = shadow.to(device)
+                for i, gt_data in enumerate(valid_dataloader):
+                    mask, light, shadow = gt_data[0], gt_data[1], gt_data[2]
+                    I_s, L_t, I_t = mask.to(device), light.to(device), shadow.to(device)
+                    img_input = I_s
 
+                    if params.sketch:
+                        sketch = gt_data[3].to(device)
+                        img_input = torch.cat([I_s, sketch], 1) 
+                        
                     # predict transfer
-                    predicted_img, predicted_src_light = model(I_s, L_t)
+                    predicted_img, predicted_src_light = model(img_input, L_t)
 
                     # compute loss
                     loss = reconstruct_loss(I_t, predicted_img)
@@ -184,14 +193,19 @@ def train(params):
 
     # dataset
     # ds_csv = "/home/ysheng/Dataset/new_dataset/meta_data.csv"
-    ds_folder = './dataset/new_dataset'
+    # ds_folder = './dataset/new_dataset'
+    ds_folder = params.ds_folder
     train_set = SSN_Dataset(ds_folder, True)
     train_dataloder = DataLoader(train_set, batch_size= min(len(train_set), params.batch_size), shuffle=True, num_workers=params.workers, drop_last=True)
     valid_set = SSN_Dataset(ds_folder, False)
     valid_dataloader = DataLoader(valid_set, batch_size= min(len(valid_set), params.batch_size), shuffle=False, num_workers=params.workers, drop_last=True)
 
     # model & optimizer & scheduler & loss function
-    model = Relight_SSN(1, 1)    # input is mask + human
+    input_channel = 1
+    if params.sketch:
+        input_channel = 2
+
+    model = Relight_SSN(input_channel, 1)    # input is mask + human
     model.to(device)    
     optimizer = set_model_optimizer(model, params.weight_decay)
     best_weight = ''
