@@ -113,7 +113,7 @@ def training_iteration(model, train_dataloder, optimizer, train_loss, epoch_num)
                 predicted_img, predicted_src_light = model(img_input, L_t)
 
                 # compute loss
-                import pdb; pdb.set_trace()
+                # import pdb; pdb.set_trace()
                 loss = reconstruct_loss(I_t, predicted_img)
 
                 loss.backward()

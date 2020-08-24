@@ -67,7 +67,7 @@ def parse_params():
     parser.add_argument('--use_schedule', action='store_true',help='use automatic schedule')
     parser.add_argument('--patience', type=int, default=2, help='use automatic schedule')
     parser.add_argument('--exp_name', type=str, default='l1 loss',help='experiment name')    
-    parser.add_argument('--norm', type=str, default='batch_norm', help='use group norm')
+    parser.add_argument('--norm', type=str, default='group_norm', help='use group norm')
     parser.add_argument('--ds_folder', type=str, default='./dataset/general_dataset', help='Dataset folder')
     parser.add_argument('--prelu', action='store_true', help='use prelu')
     parser.add_argument('--small_ds', action='store_true', help='small dataset')
