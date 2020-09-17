@@ -126,8 +126,9 @@ class SSN_Dataset(Dataset):
         return os.path.join(folder, basename[:basename.find('_')])
     
     def render_new_shadow(self, shadow_bases, seed):
+        shadow_bases = shadow_bases[:,:,:,:]
         h, w, iw, ih = shadow_bases.shape
-        
+
         num = random.randint(0, 50)
         pattern_img = self.random_pattern_generator.get_pattern(iw, ih, num=num, size=0.1, mitsuba=False, seed=int(seed))
         

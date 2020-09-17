@@ -1,0 +1,1 @@
+CUDA_VISIBLE_DEVICES=0 python train_relight_ssn.py --vis_port=8002 --need_train --relearn --baseline --workers=24 --batch_size=24 --timers=10 --use_schedule --patience=5 --exp_name='general_gui' --ds_folder='dataset/general_dataset_demo' --resume --weight_file='general_gui_27-August-10-42-PM.pt' --lr=1e-5
