@@ -1,4 +1,4 @@
-import torch
+soft_shadowimport torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 import torch.optim as optim
@@ -272,6 +272,8 @@ def train(params):
             best_valid_loss = cur_valid_loss
             global_params = options().get_params()
             best_weight = save_model("weights", model, optimizer, epoch, best_valid_loss, exp_name, hist_train_loss, hist_valid_loss, hist_lr, global_params)
+        
+        save_model('weights', model, optimizer, epoch, best_valid_loss, '{}_train'.format(exp_name), hist_train_loss, hist_valid_loss, hist_lr, global_params)
 
         # termination
         if get_lr(optimizer) < 1e-7:
