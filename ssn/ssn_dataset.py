@@ -59,6 +59,7 @@ class SSN_Dataset(Dataset):
         self.random_pattern_generator = random_pattern()
         
         self.sketch = parameter.sketch
+        self.touch = parameter.touch
         self.thread_id = os.getpid()
         self.seed = os.getpid()
 
@@ -80,7 +81,7 @@ class SSN_Dataset(Dataset):
         random.seed(cur_seed)
         
         # random ibls
-        shadow_path, mask_path, sketch_path = self.meta_data[idx]  
+        shadow_path, mask_path, sketch_path, touch_path = self.meta_data[idx]  
         mask_img = plt.imread(mask_path)
         mask_img = mask_img[:,:,0]
         if mask_img.dtype == np.uint8:
@@ -96,19 +97,31 @@ class SSN_Dataset(Dataset):
             sketch_img = plt.imread(sketch_path)
             if sketch_img.dtype == np.uint8:
                 sketch_img = sketch_img/ 255.0
+            sketch_img[np.where(sketch_img<0.4)] = 0.0
             sketch_img = sketch_img[:,:,0] + sketch_img[:,:,1] + sketch_img[:,:,2]
             sketch_img = sketch_img/np.max(sketch_img)
             sketch_img = sketch_img[:,:,np.newaxis]
 
             sketch_img = self.to_tensor(sketch_img)
             return mask_img, light_img, shadow_img, sketch_img
-        
+
+        if self.touch:
+            touch_img = plt.imread(touch_path)
+            if touch_img.dtype == np.uint8:
+                touch_img = touch_img/ 255.0
+            touch_img = touch_img[:,:,0] + touch_img[:,:,1] + touch_img[:,:,2]
+            touch_img = touch_img/np.max(touch_img)
+            touch_img = touch_img[:,:,np.newaxis]
+            touch_img = self.to_tensor(touch_img)
+            return mask_img, light_img, shadow_img, touch_img
+
         return mask_img, light_img, shadow_img
     
     def init_meta(self, ds_dir):
         base_folder = join(ds_dir, 'base')
         mask_folder = join(ds_dir, 'mask')
         sketch_folder = join(ds_dir, 'sketch')
+        touch_folder = join(ds_dir, 'touch')
         model_list = [f for f in os.listdir(base_folder) if os.path.isdir(join(base_folder, f))]
         metadata = []
         for m in model_list:
@@ -116,7 +129,10 @@ class SSN_Dataset(Dataset):
             shadows = [f for f in os.listdir(shadow_folder) if f.find('_shadow.npy')!=-1]
             for s in shadows:
                 prefix = s[:s.find('_shadow')]
-                metadata.append((join(shadow_folder, s), join(cur_mask_folder, prefix + '_mask.png'), join(join(sketch_folder, m), prefix + '_sketch.png')))
+                metadata.append((join(shadow_folder, s), 
+                                join(cur_mask_folder, prefix + '_mask.png'), 
+                                join(join(sketch_folder, m), prefix + '_sketch.png'),
+                                join(join(touch_folder, m), prefix + '_touch.png')))
         
         return metadata
 

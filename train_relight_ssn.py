@@ -60,7 +60,7 @@ def reconstruct_loss(gt_img, pred_img):
 def get_grid_img(tensor_img, norm=True):
     return utils.make_grid(tensor_img, normalize=norm).detach().cpu().unsqueeze(0)
 
-def visdom_plot_img(I_t, predicted_img, mask, L_t, is_training=True, save_batch=False):
+def visdom_plot_img(I_t, predicted_img, I_s, L_t, is_training=True, save_batch=False):
     batch_size = min(I_t.shape[0], 4)
 
     # import pdb; pdb.set_trace()
@@ -82,10 +82,14 @@ def visdom_plot_img(I_t, predicted_img, mask, L_t, is_training=True, save_batch=
         win_prefix = 'train'
     else:
         win_prefix = 'valid'
-    vis_mask = get_grid_img(mask[:batch_size])
-    
 
-    visdom_show_batch(vis_mask, cur_viz, win_name="{} masks".format(win_prefix), normalize=False)
+    # vis_mask = get_grid_img(mask[:batch_size])
+    # import pdb; pdb.set_trace()
+    channel = I_s.shape[1]
+    for i in range(channel):
+        cur_channel = I_s[:batch_size, i:i+1, :, :]
+        visdom_show_batch(cur_channel, cur_viz, win_name="{} {}".format(win_prefix, i), nrow=4, normalize=False)
+        
     visdom_show_batch(vis_shadow_img, cur_viz, win_name="{} shadow gt vs. inference".format(win_prefix), nrow=1, normalize=False)
     visdom_show_batch(get_grid_img(L_t[:batch_size]), cur_viz, win_name='{} light'.format(win_prefix), normalize=True)
 
@@ -103,7 +107,7 @@ def training_iteration(model, train_dataloder, optimizer, train_loss, epoch_num)
                 I_s, L_t, I_t = mask.to(device), light.to(device), shadow.to(device)
                 img_input = I_s
 
-                if params.sketch:
+                if params.sketch or params.touch:
                     sketch = gt_data[3].to(device)
                     img_input = torch.cat([I_s, sketch], dim=1) 
 
@@ -127,7 +131,7 @@ def training_iteration(model, train_dataloder, optimizer, train_loss, epoch_num)
                     # divide_factor = 1.0
                     visdom_plot_img(I_t, 
                                     predicted_img, 
-                                    mask, L_t, save_batch=params.save)
+                                    img_input, L_t, save_batch=params.save)
 
                 # keep tracking
                 train_loss.append(loss.item()/np.sqrt(params.batch_size))
@@ -153,7 +157,7 @@ def validation_iteration(model, valid_dataloader, valid_loss, epoch_num):
                     I_s, L_t, I_t = mask.to(device), light.to(device), shadow.to(device)
                     img_input = I_s
 
-                    if params.sketch:
+                    if params.sketch or params.touch:
                         sketch = gt_data[3].to(device)
                         img_input = torch.cat([I_s, sketch], 1) 
                         
@@ -170,7 +174,7 @@ def validation_iteration(model, valid_dataloader, valid_loss, epoch_num):
                         # divide_factor = 1.0 / torch.max(L_t) / 5.0
                         visdom_plot_img(I_t,
                                         predicted_img,
-                                        mask, L_t, False)
+                                        img_input, L_t, False)
 
                     # keep tracking
                     valid_loss.append(loss.item()/np.sqrt(params.batch_size))
@@ -202,7 +206,7 @@ def train(params):
 
     # model & optimizer & scheduler & loss function
     input_channel = 1
-    if params.sketch:
+    if params.sketch or params.touch:
         input_channel = 2
 
     model = Relight_SSN(input_channel, 1)    # input is mask + human
@@ -272,6 +276,8 @@ def train(params):
             best_valid_loss = cur_valid_loss
             global_params = options().get_params()
             best_weight = save_model("weights", model, optimizer, epoch, best_valid_loss, exp_name, hist_train_loss, hist_valid_loss, hist_lr, global_params)
+
+        best_weight = save_model("weights", model, optimizer, epoch, best_valid_loss, exp_name + "_train", hist_train_loss, hist_valid_loss, hist_lr, global_params)
 
         # termination
         if get_lr(optimizer) < 1e-7:
