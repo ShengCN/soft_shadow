@@ -13,6 +13,7 @@ import datetime
 from ssn.ssn_dataset import SSN_Dataset
 # from ssn.ssn_submodule import Contract
 from ssn.ssn import Relight_SSN
+from utils.utils_file import get_cur_time_stamp, create_folder
 from utils.net_utils import save_model, get_lr, set_lr
 from utils.visdom_utils import setup_visdom, visdom_plot_loss, visdom_log, visdom_show_batch
 from params import params as options, parse_params
@@ -103,18 +104,12 @@ def training_iteration(model, train_dataloder, optimizer, train_loss, epoch_num)
 
         for j in range(params.timers):
             for i, gt_data in enumerate(train_dataloder):
-                mask, light, shadow = gt_data[0], gt_data[1], gt_data[2]
-                I_s, L_t, I_t = mask.to(device), light.to(device), shadow.to(device)
-                img_input = I_s
-
-                if params.sketch or params.touch:
-                    sketch = gt_data[3].to(device)
-                    img_input = torch.cat([I_s, sketch], dim=1) 
-
+                inputs, light, shadow = gt_data[0], gt_data[1], gt_data[2]
+                I_s, L_t, I_t = inputs.to(device), light.to(device), shadow.to(device)
                 optimizer.zero_grad()
                 
                 # predict
-                predicted_img, predicted_src_light = model(img_input, L_t)
+                predicted_img, predicted_src_light = model(I_s, L_t)
 
                 # compute loss
                 # import pdb; pdb.set_trace()
@@ -127,11 +122,7 @@ def training_iteration(model, train_dataloder, optimizer, train_loss, epoch_num)
                 
                 # visualize results
                 if i % 10 == 0:
-                    # divide_factor = 1.0 / torch.max(L_t) / 5.0
-                    # divide_factor = 1.0
-                    visdom_plot_img(I_t, 
-                                    predicted_img, 
-                                    img_input, L_t, save_batch=params.save)
+                    visdom_plot_img(I_t, predicted_img, inputs, L_t, save_batch=params.save)
 
                 # keep tracking
                 train_loss.append(loss.item()/np.sqrt(params.batch_size))
@@ -153,16 +144,11 @@ def validation_iteration(model, valid_dataloader, valid_loss, epoch_num):
             t.set_description("(Validation)Ep. {} ".format(epoch_num))
             for j in range(cur_timer):
                 for i, gt_data in enumerate(valid_dataloader):
-                    mask, light, shadow = gt_data[0], gt_data[1], gt_data[2]
-                    I_s, L_t, I_t = mask.to(device), light.to(device), shadow.to(device)
-                    img_input = I_s
+                    inputs, light, shadow = gt_data[0], gt_data[1], gt_data[2]
+                    I_s, L_t, I_t = inputs.to(device), light.to(device), shadow.to(device)
 
-                    if params.sketch or params.touch:
-                        sketch = gt_data[3].to(device)
-                        img_input = torch.cat([I_s, sketch], 1) 
-                        
                     # predict transfer
-                    predicted_img, predicted_src_light = model(img_input, L_t)
+                    predicted_img, predicted_src_light = model(I_s, L_t)
 
                     # compute loss
                     loss = reconstruct_loss(I_t, predicted_img)
@@ -171,10 +157,7 @@ def validation_iteration(model, valid_dataloader, valid_loss, epoch_num):
 
                     # visualize results
                     if i % 10 == 0:
-                        # divide_factor = 1.0 / torch.max(L_t) / 5.0
-                        visdom_plot_img(I_t,
-                                        predicted_img,
-                                        img_input, L_t, False)
+                        visdom_plot_img(I_t, predicted_img, inputs, L_t, False)
 
                     # keep tracking
                     valid_loss.append(loss.item()/np.sqrt(params.batch_size))
@@ -205,16 +188,12 @@ def train(params):
     valid_dataloader = DataLoader(valid_set, batch_size= min(len(valid_set), params.batch_size), shuffle=False, num_workers=params.workers, drop_last=True)
 
     # model & optimizer & scheduler & loss function
-    input_channel = 1
-    if params.sketch or params.touch:
-        input_channel = 2
+    input_channel = 3
 
     model = Relight_SSN(input_channel, 1)    # input is mask + human
     model.to(device)    
     optimizer = set_model_optimizer(model, params.weight_decay)
     best_weight = ''
-
-    # import pdb;pdb.set_trace()
     
     # resume from last saved points
     if params.resume:
@@ -275,9 +254,12 @@ def train(params):
 
             best_valid_loss = cur_valid_loss
             global_params = options().get_params()
-            best_weight = save_model("weights", model, optimizer, epoch, best_valid_loss, exp_name, hist_train_loss, hist_valid_loss, hist_lr, global_params)
+            
+            outfname = '{}_{}.pt'.format(exp_name, get_cur_time_stamp())
+            best_weight = save_model("weights", model, optimizer, epoch, best_valid_loss, outfname, hist_train_loss, hist_valid_loss, hist_lr, global_params)
 
-        best_weight = save_model("weights", model, optimizer, epoch, best_valid_loss, exp_name + "_train", hist_train_loss, hist_valid_loss, hist_lr, global_params)
+        outfname = '{}.pt'.format(exp_name)
+        best_weight = save_model("weights", model, optimizer, epoch, best_valid_loss, outfname, hist_train_loss, hist_valid_loss, hist_lr, global_params)
 
         # termination
         if get_lr(optimizer) < 1e-7:

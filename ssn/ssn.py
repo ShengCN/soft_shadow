@@ -31,9 +31,6 @@ class Relight_SSN(nn.Module):
                 activation_func
             )
 
-        if parameter.coordconv:
-            self.in_conv       = Conv(n_channels, 32 - n_channels, kernel_size=7, conv_stride=1, padding=3, bias=True)
-
         self.down_256_128  = Conv(32, 64, conv_stride=2)
         self.down_128_128  = Conv(64, 64, conv_stride=1)
         self.down_128_64   = Conv(64, 128, conv_stride=2)

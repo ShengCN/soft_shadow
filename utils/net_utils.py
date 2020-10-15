@@ -38,13 +38,13 @@ def save_loss(figure_fname, train_loss, valid_loss):
     plt.legend(['train_loss', 'valid_loss'])
     plt.savefig(figure_fname)
 
-def save_model(output_folder, model, optimizer, epoch, best_loss, exp_name, hist_train_loss, hist_valid_loss, hist_lr, params):
+def save_model(output_folder, model, optimizer, epoch, best_loss, fname, hist_train_loss, hist_valid_loss, hist_lr, params):
     """ Save current best model into some folder """
     create_folder(output_folder)
 
-    cur_time_stamp = get_cur_time_stamp()
-    output_fname = os.path.join(output_folder, exp_name + '_' + cur_time_stamp + ".pt")
-
+    # cur_time_stamp = get_cur_time_stamp()
+    # output_fname = os.path.join(output_folder, exp_name + '_' + cur_time_stamp + ".pt")
+    output_fname = os.path.join(output_folder, fname)
     tmp_model = model
     if params.multi_gpu and hasattr(tmp_model, 'module'):
         tmp_model = model.module
