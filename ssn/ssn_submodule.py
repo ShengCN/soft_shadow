@@ -15,6 +15,8 @@ def get_layer_info(out_channels):
     elif parameter.norm == 'group_norm':
         if out_channels >= 32:
             group_num = 32
+            if out_channels % group_num != 0:
+                group_num = 16
         else:
             group_num = 1
             

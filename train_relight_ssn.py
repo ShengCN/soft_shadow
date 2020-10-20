@@ -11,14 +11,12 @@ from os.path import join
 import datetime
 
 from ssn.ssn_dataset import SSN_Dataset
-# from ssn.ssn_submodule import Contract
-from ssn.ssn import Relight_SSN
+from ssn.ssn_touch import SSN_Touch
 from utils.utils_file import get_cur_time_stamp, create_folder
 from utils.net_utils import save_model, get_lr, set_lr
 from utils.visdom_utils import setup_visdom, visdom_plot_loss, visdom_log, visdom_show_batch
 from params import params as options, parse_params
 import matplotlib.pyplot as plt
-from evaluation import exp_predict, exp_metric
 import pickle 
 
 # parse args
@@ -64,9 +62,9 @@ def get_grid_img(tensor_img, norm=True):
 def visdom_plot_img(I_t, predicted_img, I_s, L_t, is_training=True, save_batch=False):
     batch_size = min(I_t.shape[0], 4)
 
-    # import pdb; pdb.set_trace()
-    vis_predicted_img = get_grid_img(predicted_img[:batch_size], True)
-    vis_predicted_img_gt = get_grid_img(I_t[:batch_size], True)
+    shadow_gt, touch_gt = I_t[:,:1,:,:], I_t[:,-1:,:,:]
+    vis_predicted_img = get_grid_img(predicted_img[0][:batch_size], True)
+    vis_predicted_img_gt = get_grid_img(shadow_gt[:batch_size], True)
 
     if save_batch:
         vis_predicted_img_np = np.clip(vis_predicted_img[0].detach().cpu().numpy().transpose((1,2,0)), 0.0, 1.0)
@@ -77,21 +75,25 @@ def visdom_plot_img(I_t, predicted_img, I_s, L_t, is_training=True, save_batch=F
         plt.imsave(gt_fname, vis_predicted_img_gt_np, cmap='gray')
 
     # vis_predicted_img_gt, vis_predicted_img = get_grid_img(vis_predicted_img_gt), get_grid_img(vis_predicted_img)
-    vis_shadow_img = torch.cat((vis_predicted_img_gt,
-                                vis_predicted_img))
+    vis_shadow_img = torch.cat((vis_predicted_img_gt, vis_predicted_img))
     if is_training:
         win_prefix = 'train'
     else:
         win_prefix = 'valid'
 
     # vis_mask = get_grid_img(mask[:batch_size])
-    # import pdb; pdb.set_trace()
     channel = I_s.shape[1]
     for i in range(channel):
         cur_channel = I_s[:batch_size, i:i+1, :, :]
         visdom_show_batch(cur_channel, cur_viz, win_name="{} {}".format(win_prefix, i), nrow=4, normalize=False)
-        
+
+    # import pdb; pdb.set_trace() 
+    vis_predict_touch = get_grid_img(predicted_img[1][:batch_size], True)
+    vis_touch_gt = get_grid_img(touch_gt[:batch_size], True)
+    vis_touch = torch.cat((vis_touch_gt, vis_predict_touch))
+
     visdom_show_batch(vis_shadow_img, cur_viz, win_name="{} shadow gt vs. inference".format(win_prefix), nrow=1, normalize=False)
+    visdom_show_batch(vis_touch, cur_viz, win_name="{} touch".format(win_prefix), nrow=1, normalize=False)
     visdom_show_batch(get_grid_img(L_t[:batch_size]), cur_viz, win_name='{} light'.format(win_prefix), normalize=True)
 
 def training_iteration(model, train_dataloder, optimizer, train_loss, epoch_num):
@@ -99,22 +101,23 @@ def training_iteration(model, train_dataloder, optimizer, train_loss, epoch_num)
     cur_epoch_loss = 0.0
     model.train()
     
+    # import pdb; pdb.set_trace()
     with tqdm(total=len(train_dataloder) * params.timers) as t:
         t.set_description("Ep. {}".format(epoch_num))
 
         for j in range(params.timers):
             for i, gt_data in enumerate(train_dataloder):
-                inputs, light, shadow = gt_data[0], gt_data[1], gt_data[2]
-                I_s, L_t, I_t = inputs.to(device), light.to(device), shadow.to(device)
+                inputs, light, gt, loss_lambda = gt_data[0], gt_data[1], gt_data[2], gt_data[3]
+                I_s, L_t, I_t, loss_lambda = inputs.to(device), light.to(device), gt.to(device), loss_lambda.to(device)
                 optimizer.zero_grad()
                 
                 # predict
-                predicted_img, predicted_src_light = model(I_s, L_t)
+                predicted_img, predicted_touch = model(I_s, L_t)
 
                 # compute loss
                 # import pdb; pdb.set_trace()
-                loss = reconstruct_loss(I_t, predicted_img)
-
+                shadow_gt, touch_gt = I_t[:,0:1,:,:], I_t[:,-1:,:,:]
+                loss = reconstruct_loss(shadow_gt, predicted_img)  + reconstruct_loss(touch_gt * loss_lambda, predicted_touch * loss_lambda) 
                 loss.backward()
                 optimizer.step()
                 
@@ -122,7 +125,7 @@ def training_iteration(model, train_dataloder, optimizer, train_loss, epoch_num)
                 
                 # visualize results
                 if i % 10 == 0:
-                    visdom_plot_img(I_t, predicted_img, inputs, L_t, save_batch=params.save)
+                    visdom_plot_img(I_t, [predicted_img, predicted_touch], inputs, L_t, save_batch=params.save)
 
                 # keep tracking
                 train_loss.append(loss.item()/np.sqrt(params.batch_size))
@@ -144,20 +147,21 @@ def validation_iteration(model, valid_dataloader, valid_loss, epoch_num):
             t.set_description("(Validation)Ep. {} ".format(epoch_num))
             for j in range(cur_timer):
                 for i, gt_data in enumerate(valid_dataloader):
-                    inputs, light, shadow = gt_data[0], gt_data[1], gt_data[2]
-                    I_s, L_t, I_t = inputs.to(device), light.to(device), shadow.to(device)
+                    inputs, light, gt, loss_lambda = gt_data[0], gt_data[1], gt_data[2], gt_data[3]
+                    I_s, L_t, I_t, loss_lambda = inputs.to(device), light.to(device), gt.to(device), loss_lambda.to(device)
 
-                    # predict transfer
-                    predicted_img, predicted_src_light = model(I_s, L_t)
+                    # predict
+                    predicted_img, predicted_touch = model(I_s, L_t)
 
                     # compute loss
-                    loss = reconstruct_loss(I_t, predicted_img)
+                    shadow_gt, touch_gt = I_t[:,0:1,:,:], I_t[:,-1:,:,:]
+                    loss = reconstruct_loss(shadow_gt, predicted_img) + reconstruct_loss(touch_gt * loss_lambda, predicted_touch * loss_lambda) 
 
                     cur_epoch_loss += loss.item()
 
                     # visualize results
                     if i % 10 == 0:
-                        visdom_plot_img(I_t, predicted_img, inputs, L_t, False)
+                        visdom_plot_img(I_t, [predicted_img, predicted_touch], inputs, L_t, False)
 
                     # keep tracking
                     valid_loss.append(loss.item()/np.sqrt(params.batch_size))
@@ -190,7 +194,7 @@ def train(params):
     # model & optimizer & scheduler & loss function
     input_channel = 3
 
-    model = Relight_SSN(input_channel, 1)    # input is mask + human
+    model = SSN_Touch()        
     model.to(device)    
     optimizer = set_model_optimizer(model, params.weight_decay)
     best_weight = ''
@@ -269,49 +273,50 @@ def train(params):
     return best_weight
 
 if __name__ == "__main__":    
+    best_weight, best_valid_loss = train(params)
     # trainig
-    result_log = ''
-    if params.need_train:
-        best_weight, best_valid_loss = train(params)
-    else: 
-        best_weight = os.path.join("weights", params.weight_file)
+    # result_log = ''
+    # if params.need_train:
+    #     best_weight, best_valid_loss = train(params)
+    # else: 
+    #     best_weight = os.path.join("weights", params.weight_file)
     
-    checkpoint = torch.load(best_weight, map_location=device)
-    best_valid_loss = checkpoint['best_loss']
+    # checkpoint = torch.load(best_weight, map_location=device)
+    # best_valid_loss = checkpoint['best_loss']
 
-    result_log += 'best valid loss: {} \n'.format(best_valid_loss)
+    # result_log += 'best valid loss: {} \n'.format(best_valid_loss)
     
-    model = Relight_SSN(1, 1)    # input is mask + human
-    model.to(device) 
-    model.load_state_dict(checkpoint['model_state_dict'])
+    # model = SSN_Touch(1, 1)    # input is mask + human
+    # model.to(device) 
+    # model.load_state_dict(checkpoint['model_state_dict'])
     
-    # run predictions
-    exp_output = os.path.join('exp_result', exp_name)
-    os.makedirs(exp_output, exist_ok=True)
-    eval_folder = 'dataset/evaluation'
-    exp_predict.predict(model, eval_folder, exp_output, device)
+    # # run predictions
+    # exp_output = os.path.join('exp_result', exp_name)
+    # os.makedirs(exp_output, exist_ok=True)
+    # eval_folder = 'dataset/evaluation'
+    # exp_predict.predict(model, eval_folder, exp_output, device)
 
-    # run metric eval
-    num_metric_result, size_metric_result = exp_metric.compute_exp_results(eval_folder, exp_output)
-    num_avg, size_avg = np.zeros((1,3)), np.zeros((1,3))
-    for k in num_metric_result.keys():
-        num_avg += num_metric_result[k] / len(num_metric_result.keys())
+    # # run metric eval
+    # num_metric_result, size_metric_result = exp_metric.compute_exp_results(eval_folder, exp_output)
+    # num_avg, size_avg = np.zeros((1,3)), np.zeros((1,3))
+    # for k in num_metric_result.keys():
+    #     num_avg += num_metric_result[k] / len(num_metric_result.keys())
 
-    print("average result: ", num_avg)
-    result_log += 'average result: {} \n'.format(num_avg)
+    # print("average result: ", num_avg)
+    # result_log += 'average result: {} \n'.format(num_avg)
 
-    # save results 
-    exp_result_folder = 'exp_log'
-    os.makedirs(exp_result_folder, exist_ok=True)
-    exp_result_folder = join(exp_result_folder, exp_name)
-    os.makedirs(exp_result_folder, exist_ok=True)
+    # # save results 
+    # exp_result_folder = 'exp_log'
+    # os.makedirs(exp_result_folder, exist_ok=True)
+    # exp_result_folder = join(exp_result_folder, exp_name)
+    # os.makedirs(exp_result_folder, exist_ok=True)
 
-    with open(os.path.join(exp_result_folder, exp_name + ".txt"), 'w+') as f:
-        f.write(result_log)
+    # with open(os.path.join(exp_result_folder, exp_name + ".txt"), 'w+') as f:
+    #     f.write(result_log)
     
-    num_metric_savefname, size_metric_savefname = os.path.join(exp_result_folder, exp_name + '_ibl.pkl'), os.path.join(exp_result_folder, exp_name + '_num.pkl')
-    with open(num_metric_savefname, 'wb') as f:
-        pickle.dump(num_metric_result, f)
+    # num_metric_savefname, size_metric_savefname = os.path.join(exp_result_folder, exp_name + '_ibl.pkl'), os.path.join(exp_result_folder, exp_name + '_num.pkl')
+    # with open(num_metric_savefname, 'wb') as f:
+    #     pickle.dump(num_metric_result, f)
 
-    with open(size_metric_savefname, 'wb') as f:
-        pickle.dump(size_metric_result, f)
+    # with open(size_metric_savefname, 'wb') as f:
+    #     pickle.dump(size_metric_result, f)

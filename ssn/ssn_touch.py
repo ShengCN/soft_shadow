@@ -60,7 +60,10 @@ class SSN_decoder(nn.Module):
         self.up_128_128 = Conv(32 * concat_timer + 64 * (concat_timer-1), 64)
         self.up_128_256 = Up(64 * concat_timer, 16 * concat_timer)
 
-        self.out_conv = Conv(16 * concat_timer + 32 * (concat_timer-1), out_channels, force_relu=True)
+        # self.out_conv = Conv(16 * concat_timer + 32 * (concat_timer-1), out_channels, force_relu=True)
+
+        self.shadow_out = Conv(16 * concat_timer + 32 * (concat_timer-1), out_channels, force_relu=True)
+        self.touch_out = Conv(16 * concat_timer + 32 * (concat_timer-1), out_channels, force_relu=True)
     
     def forward(self, bottle_insert, encoder_features):
         """
@@ -102,7 +105,7 @@ class SSN_decoder(nn.Module):
         y = self.up_128_256(y)
         
         y = skip_link(y, x1)
-        return self.out_conv(y)
+        return self.shadow_out(y), self.touch_out(y)
     
 class SSN_Touch(nn.Module):
     def __init__(self):
@@ -112,15 +115,8 @@ class SSN_Touch(nn.Module):
         """
         super(SSN_Touch, self).__init__()
 
-        # Geometry
-        self.shadow_encoder = SSN_encoder(1, 512)
-        # Touch
-        self.touch_encoder = SSN_encoder(2, 512)
-
-        # -> Touch
-        self.touch_decoder = SSN_decoder(512, 1)
-        # -> Shadow
-        self.shadow_decoder = SSN_decoder(512 + 512 + 256, 1, concat_timer=3)
+        self.encoder = SSN_encoder(2, 512)
+        self.decoder = SSN_decoder(512 + 256, 1) # two head decoder
 
         self.ibl_conv = Conv(512, 256)
     
@@ -132,27 +128,19 @@ class SSN_Touch(nn.Module):
         Outputs:
             shadow prediction, touch prediction
         """
-        shadow_encoder_path = self.shadow_encoder(I_s[:,-2:-1,:,:])
-        touch_encoder_path = self.touch_encoder(I_s[:,:-1,:,:])
+        code = self.encoder(I_s)
         
         ibl_bottle = L_t.view(-1, 512, 1, 1).repeat(1,1,16,16)
         ibl_bottle = self.ibl_conv(ibl_bottle)
-
-        # merge downstream path for shadow
-        for i in range(len(shadow_encoder_path)):
-            shadow_encoder_path[i] = torch.cat((shadow_encoder_path[i], touch_encoder_path[i]),dim=1) 
-
-        shadow_predict = self.shadow_decoder(ibl_bottle, shadow_encoder_path)
-        touch_predict = self.touch_decoder(None, touch_encoder_path)
-        return shadow_predict, touch_predict
+        
+        return self.decoder(ibl_bottle, code)
 
 if __name__ == '__main__':
     print("SSN touch sanity check")
     mask = torch.zeros((1,1,256,256))
-    sketch = torch.zeros((1,1,256,256))
     touch = torch.zeros((1,1,256,256))
     ibl = torch.zeros((1,1,16,32))
 
     ssn = SSN_Touch()
-    pred, touch_pred = ssn(torch.cat((mask, sketch, touch), dim=1), ibl)
+    pred, touch_pred = ssn(torch.cat((mask, touch), dim=1), ibl)
     print('pred: {}, touch_pred: {}'.format(pred.shape, touch_pred.shape))

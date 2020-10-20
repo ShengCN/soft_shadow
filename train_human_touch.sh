@@ -1,1 +1,1 @@
-CUDA_VISIBLE_DEVICES=0,1,2 python train_relight_ssn.py --vis_port=8003 --need_train --relearn --multi_gpu --baseline --workers=66 --batch_size=66 --timers=80 --touch --exp_name='human_touch' --ds_folder='dataset/human_ds' --lr=1e-5 --resume --weight_file="human_touch_27-September-12-41-AM.pt" 
+CUDA_VISIBLE_DEVICES=0,1,2 python train_relight_ssn.py --vis_port=8003 --need_train --relearn --multi_gpu --baseline --workers=66 --batch_size=66 --timers=80 --touch_prob=0.5 --exp_name='new_arch_touch' --ds_folder='dataset/human_ds' --lr=1e-3 
