@@ -1,1 +1,1 @@
-CUDA_VISIBLE_DEVICES=0,1,2 python train_relight_ssn.py --multi_gpu --vis_port=8002 --need_train --relearn --baseline --workers=66 --batch_size=68 --timers=20 --exp_name='general_baseline' --ds_folder='dataset/general_ds' --lr=1e-4 --resume --weight_file="general_baseline_train_11-October-04-50-PM.pt"
+CUDA_VISIBLE_DEVICES=0,1,2 python train_relight_ssn.py --multi_gpu --vis_port=8002 --need_train --relearn --baseline --touch_prob=-1.0 --workers=68 --batch_size=66 --timers=20 --exp_name='general_baseline' --ds_folder='dataset/general_ds' --lr=1e-3

@@ -1,1 +1,1 @@
-CUDA_VISIBLE_DEVICES=0,1,2 python train_relight_ssn.py --multi_gpu --vis_port=8002 --need_train --relearn --baseline --touch_lambda=0.0 --touch_prob=-1.0 --workers=21 --batch_size=21 --timers=60 --exp_name='new_arch_baseline' --ds_folder='dataset/human_ds' --lr=1e-3
+CUDA_VISIBLE_DEVICES=0,1,2 python train_relight_ssn.py --multi_gpu --vis_port=8002 --need_train --relearn --baseline --workers=66 --batch_size=66 --timers=80 --touch_prob=-1 --exp_name='new_arch_baseline' --ds_folder='dataset/human_ds' --lr=1e-4 --resume --weight_file="new_arch_baseline.pt"

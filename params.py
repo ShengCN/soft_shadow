@@ -5,7 +5,7 @@ class params():
     
     class __params():
         def __init__(self):
-            self.norm = 'batch_norm'
+            self.norm = 'group_norm'
             self.prelu = False
             self.weight_decay = 5e-4
             self.small_ds = False
@@ -15,8 +15,6 @@ class params():
             self.vis_port = 8002
             self.need_train = True
             self.cpu = False
-            # self.coordconv = False
-            # self.psp = False
             self.sketch = False
             self.touch_prob = 0.5
 
