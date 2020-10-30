@@ -5,7 +5,7 @@ class params():
     
     class __params():
         def __init__(self):
-            self.norm = 'batch_norm'
+            self.norm = 'group_norm'
             self.prelu = False
             self.weight_decay = 5e-4
             self.small_ds = False
