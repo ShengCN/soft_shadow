@@ -13,6 +13,12 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 def run_prediction(model, benchmark_folder, out_folder, baseline=True):
     def run_one_folder(model, folder, out_folder):
         model_folders = glob.glob(join(folder, '*'))
+        human_general = os.path.basename(folder)
+        if human_general == 'general':
+            is_general = True
+        else:
+            is_general = False
+
         for mf in tqdm(model_folders):
             # create output folder
             mf_base = os.path.basename(mf)
@@ -21,7 +27,7 @@ def run_prediction(model, benchmark_folder, out_folder, baseline=True):
 
             gts = glob.glob(join(mf, '*.png'))
             for gt in gts:
-                mask, ibl = get_mask_ibl(gt) 
+                mask, ibl = get_mask_ibl(gt, is_general) 
                 img = ssn_touch_pred(model, mask, ibl, device, baseline)
                 img = np.repeat(img, 3, axis=2)
                 
@@ -45,11 +51,14 @@ def run_metric(gt_folder, pred_folder):
 
 if __name__ == '__main__':
     model = SSN_Touch()
-    
+    model.to(device)
+    weight_file = 'weights/new_arch_baseline.pt'
+    checkpoint = torch.load(weight_file, map_location=device)
+    model.load_state_dict(checkpoint['model_state_dict'])
+
     benchmark_folder = '/home/ysheng/Dataset/benchmark_ds'
-    exp_name = 'new_arch_base'
+    exp_name = 'new_arch_general_baseline'
     out_folder = join(benchmark_folder, exp_name)
     os.makedirs(out_folder, exist_ok=True)
-    model.to(device)
 
-    run_prediction(model, join(benchmark_folder,'shadow_gt'), out_folder)
+    run_prediction(model, join(benchmark_folder,'shadow_gt'), out_folder, baseline=True)

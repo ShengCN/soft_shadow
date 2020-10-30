@@ -17,5 +17,7 @@ def random_perturb(img):
     if random.random() < 0.5:
         perturbed = cv2.dilate(perturbed, random_kernel(), iterations = 1)
     
-    cv2.normalize(perturbed, perturbed, 0.0,1.0,cv2.NORM_MINMAX)
+    cv2.normalize(perturbed, perturbed, 0.0,1.0, cv2.NORM_MINMAX)
+    if len(perturbed.shape) == 2:
+        perturbed = perturbed[:,:,np.newaxis]
     return perturbed

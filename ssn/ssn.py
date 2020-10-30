@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .ssn_submodule import Conv, Up, Up_Stream, get_layer_info, add_coords
+from .ssn_submodule import Conv, Up, Up_Stream, get_layer_info
 from params import params
 
 class Relight_SSN(nn.Module):

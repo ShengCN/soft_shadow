@@ -1,5 +1,6 @@
 import numpy as np
 import math
+from skimage.metrics import structural_similarity as ssim
 
 def input_check(I1, I2):
     if len(I1.shape) != 2 or len(I2.shape) != 2:
@@ -59,17 +60,29 @@ def ZNCC(I1, I2):
     
     return np.sum(np.multiply(cen1, cen2))/(sig1 * sig2 * num_pixels)
 
+def DSSIM(I1, I2):
+    """ src: scikit-image, ssim
+        I1: GT
+        I2: pred
+    """
+    if not input_check(I1, I2):
+        print('input shape is wrong')
+        return 0.0
+    
+    return 0.5 * (1.0-ssim(I1, I2))    
+    
 if __name__ == '__main__':
     # prepare testing for the two functions
     h,w = 512, 512
     test_1, test_2 = np.zeros((h,w)), np.ones((h,w))
     test_random = np.random.rand(h,w)
-
+    
     print('rmse: {}'.format(rmse(test_1, test_2)))
     print('rmse_s: {}'.format(rmse_s(test_1, test_2)))
 
     print('ZNCC: {}'.format(ZNCC(test_random, test_random)))
     print('ZNCC: {}'.format(ZNCC(test_random * 0.5, test_random)))
     # print(rmse(test_1, test_2))
-
+    
+    print('ssim: {}'.format(DSSIM(test_1, test_1)))
     

@@ -67,7 +67,7 @@ def to_tensor(mask_np, ibl_np):
     ibl = tensor_convert(ibl_np)
     return mask.unsqueeze(0), ibl.unsqueeze(0)
 
-def ssn_touch_pred(model, mask, ibl, dev, baseline=False):
+def ssn_touch_pred(model, mask, ibl, dev, baseline=False, old_ssn=False):
     ibl_img = to_net_ibl(ibl)
     mask_img = plt.imread(mask)
     if mask_img.dtype == np.uint8:
@@ -76,8 +76,10 @@ def ssn_touch_pred(model, mask, ibl, dev, baseline=False):
     mask_img = (mask_img[:,:,0] + mask_img[:,:,1] + mask_img[:,:,2])/3.0
     mask, ibl = to_tensor(mask_img, ibl_img)
     mask, ibl = mask.to(dev), ibl.to(dev)
-    touch = torch.zeros((1,1,256,256)).to(dev)
-    I_s = torch.cat((mask, touch), 1)
+    
+    if not old_ssn:
+        touch = torch.zeros((1,1,256,256)).to(dev)
+        I_s = torch.cat((mask, touch), 1)
     
     I_s = I_s.to(dev)
     shadow, touch_pred = model(I_s, ibl)
