@@ -15,10 +15,7 @@ class params():
             self.vis_port = 8002
             self.need_train = True
             self.cpu = False
-            # self.coordconv = False
-            # self.psp = False
-            self.sketch = False
-            self.touch = False
+            self.pred_touch = False
 
         def set_params(self, options):
             self.options = options
@@ -32,11 +29,8 @@ class params():
             self.vis_port = options.vis_port
             self.need_train = options.need_train
             self.cpu = options.cpu
-            # self.coordconv = options.coordconv
-            # self.psp = options.psp
             self.ds_folder = options.ds_folder
-            self.sketch = options.sketch
-            self.touch = options.touch
+            self.pred_touch = options.pred_touch
             
         def __str__(self):
             return 'norm: {}  prelu: {} weight decay: {} small ds: {}'.format(self.norm, self.prelu, self.weight_decay, self.small_ds)
@@ -80,10 +74,7 @@ def parse_params():
     parser.add_argument('--need_train', action='store_true', help='save batch results?')
     parser.add_argument('--baseline', action='store_true', help='baseline method')
     parser.add_argument('--cpu', action='store_true', help='Force training on CPU')
-    # parser.add_argument('--coordconv', action='store_true', help='use coord convolution')
-    # parser.add_argument('--psp', action='store_true', help='PSP bottleneck')
-    parser.add_argument('--sketch', action='store_true', help='Use sketch')
-    parser.add_argument('--touch', action='store_true', help='Use touching surface')
+    parser.add_argument('--pred_touch', action='store_true', help='Use touching surface')
 
     arguments = parser.parse_args()
     parameter = params()

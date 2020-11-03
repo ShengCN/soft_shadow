@@ -101,18 +101,24 @@ def training_iteration(model, train_dataloder, optimizer, train_loss, epoch_num)
     
     with tqdm(total=len(train_dataloder) * params.timers) as t:
         t.set_description("Ep. {}".format(epoch_num))
-
         for j in range(params.timers):
             for i, gt_data in enumerate(train_dataloder):
                 inputs, light, shadow = gt_data[0], gt_data[1], gt_data[2]
                 I_s, L_t, I_t = inputs.to(device), light.to(device), shadow.to(device)
                 optimizer.zero_grad()
                 
+                mask, touch = I_s[:,:1,:,:], I_s[:,-1:,:,:]
+                
                 # predict
+                if params.baseline:
+                    I_s = mask
+                    
                 predicted_img, predicted_src_light = model(I_s, L_t)
 
                 # compute loss
-                # import pdb; pdb.set_trace()
+                if params.pred_touch:
+                    I_t = touch
+                    
                 loss = reconstruct_loss(I_t, predicted_img)
 
                 loss.backward()
@@ -146,7 +152,18 @@ def validation_iteration(model, valid_dataloader, valid_loss, epoch_num):
                 for i, gt_data in enumerate(valid_dataloader):
                     inputs, light, shadow = gt_data[0], gt_data[1], gt_data[2]
                     I_s, L_t, I_t = inputs.to(device), light.to(device), shadow.to(device)
+                    mask, touch = I_s[:,:1,:,:], I_s[:,-1:,:,:]
 
+                    # predict
+                    if params.baseline:
+                        I_s = mask
+
+                    predicted_img, predicted_src_light = model(I_s, L_t)
+
+                    # compute loss
+                    if params.pred_touch:
+                        I_t = touch
+                    
                     # predict transfer
                     predicted_img, predicted_src_light = model(I_s, L_t)
 
@@ -188,8 +205,10 @@ def train(params):
     valid_dataloader = DataLoader(valid_set, batch_size= min(len(valid_set), params.batch_size), shuffle=False, num_workers=params.workers, drop_last=True)
 
     # model & optimizer & scheduler & loss function
-    input_channel = 3
-
+    input_channel = 2
+    if params.baseline:
+        input_channel = 1
+    
     model = Relight_SSN(input_channel, 1)    # input is mask + human
     model.to(device)    
     optimizer = set_model_optimizer(model, params.weight_decay)
@@ -269,49 +288,4 @@ def train(params):
     return best_weight
 
 if __name__ == "__main__":    
-    # trainig
-    result_log = ''
-    if params.need_train:
-        best_weight, best_valid_loss = train(params)
-    else: 
-        best_weight = os.path.join("weights", params.weight_file)
-    
-    checkpoint = torch.load(best_weight, map_location=device)
-    best_valid_loss = checkpoint['best_loss']
-
-    result_log += 'best valid loss: {} \n'.format(best_valid_loss)
-    
-    model = Relight_SSN(1, 1)    # input is mask + human
-    model.to(device) 
-    model.load_state_dict(checkpoint['model_state_dict'])
-    
-    # run predictions
-    exp_output = os.path.join('exp_result', exp_name)
-    os.makedirs(exp_output, exist_ok=True)
-    eval_folder = 'dataset/evaluation'
-    exp_predict.predict(model, eval_folder, exp_output, device)
-
-    # run metric eval
-    num_metric_result, size_metric_result = exp_metric.compute_exp_results(eval_folder, exp_output)
-    num_avg, size_avg = np.zeros((1,3)), np.zeros((1,3))
-    for k in num_metric_result.keys():
-        num_avg += num_metric_result[k] / len(num_metric_result.keys())
-
-    print("average result: ", num_avg)
-    result_log += 'average result: {} \n'.format(num_avg)
-
-    # save results 
-    exp_result_folder = 'exp_log'
-    os.makedirs(exp_result_folder, exist_ok=True)
-    exp_result_folder = join(exp_result_folder, exp_name)
-    os.makedirs(exp_result_folder, exist_ok=True)
-
-    with open(os.path.join(exp_result_folder, exp_name + ".txt"), 'w+') as f:
-        f.write(result_log)
-    
-    num_metric_savefname, size_metric_savefname = os.path.join(exp_result_folder, exp_name + '_ibl.pkl'), os.path.join(exp_result_folder, exp_name + '_num.pkl')
-    with open(num_metric_savefname, 'wb') as f:
-        pickle.dump(num_metric_result, f)
-
-    with open(size_metric_savefname, 'wb') as f:
-        pickle.dump(size_metric_result, f)
+    best_weight, best_valid_loss = train(params)

@@ -58,8 +58,6 @@ class SSN_Dataset(Dataset):
         
         self.random_pattern_generator = random_pattern()
         
-        self.sketch = parameter.sketch
-        self.touch = parameter.touch
         self.thread_id = os.getpid()
         self.seed = os.getpid()
 
@@ -92,31 +90,15 @@ class SSN_Dataset(Dataset):
         shadow_img, light_img = self.render_new_shadow(shadow_bases, cur_seed)
 
         h,w = mask_img.shape[0], mask_img.shape[1] 
-        if self.sketch: 
-            sketch_img = self.read_img(sketch_path)
-            sketch_img[np.where(sketch_img<0.4)] = 0.0
-            sketch_img = sketch_img[:,:,0] + sketch_img[:,:,1] + sketch_img[:,:,2]
-            if np.max(sketch_img) < 1e-3:
-                sketch_img = np.zeros((h,w,1))
-            else:
-                sketch_img = sketch_img/np.max(sketch_img)
-                sketch_img = sketch_img[:,:,np.newaxis]
-        else:
-            sketch_img = np.zeros((h,w,1))
-        
-        if self.touch:
-            touch_img = self.read_img(touch_path)
-            touch_img = touch_img[:,:,0] + touch_img[:,:,1] + touch_img[:,:,2]
-            if np.max(touch_img) < 1e-3:
-                touch_img = np.zeros((h,w,1))
-            else:
-                touch_img = touch_img/np.max(touch_img)
-                touch_img = touch_img[:,:,np.newaxis]
-        else:
+        touch_img = self.read_img(touch_path)
+        touch_img = touch_img[:,:,0] + touch_img[:,:,1] + touch_img[:,:,2]
+        if np.max(touch_img) < 1e-3:
             touch_img = np.zeros((h,w,1))
+        else:
+            touch_img = touch_img/np.max(touch_img)
+            touch_img = touch_img[:,:,np.newaxis]
 
-        # print('mask: {}, touch: {}, sketch: {}'.format(mask_img.shape, touch_img.shape, sketch_img.shape))
-        input_img = np.concatenate((mask_img, touch_img, sketch_img), axis=2)
+        input_img = np.concatenate((mask_img, touch_img), axis=2)
         input_img, shadow_img, light_img = self.to_tensor(input_img), self.to_tensor(shadow_img),self.to_tensor(light_img)
         return input_img, light_img, shadow_img
     

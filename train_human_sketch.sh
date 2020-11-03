@@ -1,1 +1,0 @@
-CUDA_VISIBLE_DEVICES=0,1,2 python train_relight_ssn.py --vis_port=8003 --need_train --relearn --multi_gpu --baseline --workers=66 --batch_size=66 --timers=80 --sketch --exp_name='human_sketch' --ds_folder='dataset/human_ds' --lr=1e-5 --resume --weight_file="human_sketch_25-September-05-20-AM.pt"

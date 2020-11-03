@@ -1,0 +1,1 @@
+CUDA_VISIBLE_DEVICES=0,1,2 python train_relight_ssn.py --vis_port=8003 --need_train --relearn --multi_gpu --baseline --pred_touch --workers=72 --batch_size=72 --timers=60 --exp_name='pred_touch' --ds_folder='dataset/human_ds' --lr=1e-4 --resume --weight_file='pred_touch.pt'
