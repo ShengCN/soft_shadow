@@ -20,29 +20,30 @@ class random_pattern():
         # y = []
         pass
 
-    def get_pattern(self, w, h, num=50, scale=3.0, size=0.1, energy=3500, mitsuba=False, seed=None, dataset=False):
+    def get_pattern(self, w, h, x_density=512, y_density=128, num=50, scale=3.0, size=0.1, energy=3500, mitsuba=False, seed=None, dataset=False):
         if seed is None:
             seed = random.randint(0,19920208)
         else:
             seed = seed + int(time.time())
 
         if num == 0:
-            ibl = np.zeros((256,512))
+            ibl = np.zeros((y_density,x_density))
         else:
-            # factor = 80/256
-            factor = 1.0
+            y_fact = y_density/256
+
             gs = ig.Composite(operator=np.add,
                             generators=[ig.Gaussian(
                                         size=size*ng.UniformRandom(seed=seed+i+4),
                                         scale=scale*(ng.UniformRandom(seed=seed+i+5)+1e-3),
                                         x=ng.UniformRandom(seed=seed+i+1)-0.5,
-                                        y=(ng.UniformRandom(seed=seed+i+2)-0.5)*factor,
+                                        y=((1.0-ng.UniformRandom(seed=seed+i+2) * y_fact) - 0.5),
                                         aspect_ratio=0.7,
                                         orientation=np.pi*ng.UniformRandom(seed=seed+i+3),
                                         ) for i in range(num)],
                                 position=(0, 0), 
                                 xdensity=512)
-            ibl = self.normalize(gs(), energy) 
+            
+            ibl = gs()[:y_density, :]
         
         # prepare to fix energy inconsistent
         if dataset:

@@ -1,0 +1,1 @@
+python train_relight_ssn.py --relearn --multi_gpu --exp_name="human_tbaseline" --ds_folder="./dataset/human_ds" --vis_port=8002 --tbaseline --timers=60 --workers=72 --batch_size=72 --resume --weight_file='human_baseline.pt' --lr=1e-3

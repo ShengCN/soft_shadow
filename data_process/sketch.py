@@ -13,7 +13,7 @@ def get_folders(folder):
 
 def sketch(normal, depth):
     normal_img, depth_img = cv2.imread(normal), cv2.imread(depth)
-    normal_edge = cv2.Canny(normal_img, 0, 200)
+    normal_edge = cv2.Canny(normal_img, 600, 1000)
     depth_edge = cv2.Canny(depth_img, 0, 10)
     alpha = 0.3
     merged_edge = normal_edge * (1.0-alpha) + depth_edge * alpha

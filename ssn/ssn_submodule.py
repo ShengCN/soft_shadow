@@ -76,14 +76,6 @@ class Conv(nn.Module):
         super().__init__()
         
         parameter = params().get_params()
-        if parameter.coordconv:
-            self.use_coordconv = True
-            self.add_coord = add_coords(use_cuda=not parameter.cpu)
-        else:
-            self.use_coordconv = False
-
-        if parameter.coordconv:
-            in_channels = in_channels + 2
         
         if parameter.prelu:
             activation_func = 'prelu'
@@ -101,9 +93,6 @@ class Conv(nn.Module):
                 activation_func)
 
     def forward(self, x):
-        if self.use_coordconv:
-            x = self.add_coord(x)
-
         return self.conv(x)
 
 class Up(nn.Module):
@@ -199,11 +188,6 @@ class Up_Stream(nn.Module):
         self.up_128_256 = Up(128, 32, activation_func=activation_func)
         self.out_conv = Conv(64, out_channels, activation_func='relu')
         
-        self.use_psp = parameter.psp 
-        if parameter.psp:
-            self.psp = PSP(input_channel)
-        # import pdb; pdb.set_trace()
-        
     def forward(self, l, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11):
         # batch_size, c, h, w = l.size()
         
@@ -212,11 +196,6 @@ class Up_Stream(nn.Module):
         y = l.view(-1, 512, 1, 1).repeat(1, 1, 16, 16)
 
         y = self.up_16_16_1(y)    # 256 x 16 x 16
-        # import pdb; pdb.set_trace()
-        
-        if self.use_psp:
-            # psp
-            x10 = self.psp(x10)
 
         y = torch.cat((x10,y), dim=1)   # 768 x 16 x 16
         # print(y.size())
