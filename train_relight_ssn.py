@@ -12,7 +12,7 @@ import datetime
 
 from ssn.ssn_dataset import SSN_Dataset
 # from ssn.ssn_submodule import Contract
-from ssn.ssn import Relight_SSN
+from ssn.ssn import Relight_SSN, baseline_2_tbaseline, baseline_2_touchloss
 from utils.utils_file import get_cur_time_stamp, create_folder
 from utils.net_utils import save_model, get_lr, set_lr
 from utils.visdom_utils import setup_visdom, visdom_plot_loss, visdom_log, visdom_show_batch
@@ -63,11 +63,17 @@ def get_grid_img(tensor_img, norm=True):
 
 def visdom_plot_img(I_t, predicted_img, I_s, L_t, is_training=True, save_batch=False):
     batch_size = min(I_t.shape[0], 4)
-
+    
+    out_channel = predicted_img.shape[1]
+    
     # import pdb; pdb.set_trace()
-    vis_predicted_img = get_grid_img(predicted_img[:batch_size], True)
-    vis_predicted_img_gt = get_grid_img(I_t[:batch_size], True)
-
+    vis_predicted_img = get_grid_img(predicted_img[:batch_size,0:1,:,:], True)
+    vis_predicted_img_gt = get_grid_img(I_t[:batch_size,:1,:, :], True)
+    
+    if out_channel == 2:
+        vis_touch_img = get_grid_img(predicted_img[:batch_size,-1:,:,:], True)
+        vis_touch_img_gt = get_grid_img(I_t[:batch_size,-1:,:, :], True)
+    
     if save_batch:
         vis_predicted_img_np = np.clip(vis_predicted_img[0].detach().cpu().numpy().transpose((1,2,0)), 0.0, 1.0)
         vis_predicted_img_gt_np = np.clip(vis_predicted_img_gt[0].detach().cpu().numpy().transpose((1,2,0)), 0.0, 1.0)
@@ -76,24 +82,25 @@ def visdom_plot_img(I_t, predicted_img, I_s, L_t, is_training=True, save_batch=F
         plt.imsave(pred_fname, vis_predicted_img_np, cmap='gray')
         plt.imsave(gt_fname, vis_predicted_img_gt_np, cmap='gray')
 
-    # vis_predicted_img_gt, vis_predicted_img = get_grid_img(vis_predicted_img_gt), get_grid_img(vis_predicted_img)
-    vis_shadow_img = torch.cat((vis_predicted_img_gt,
-                                vis_predicted_img))
+    vis_shadow_img = torch.cat((vis_predicted_img_gt, vis_predicted_img))
+    if out_channel == 2:
+        vis_touch_img = torch.cat((vis_touch_img_gt, vis_touch_img))
+        
     if is_training:
         win_prefix = 'train'
     else:
         win_prefix = 'valid'
 
-    # vis_mask = get_grid_img(mask[:batch_size])
-    # import pdb; pdb.set_trace()
     channel = I_s.shape[1]
     for i in range(channel):
         cur_channel = I_s[:batch_size, i:i+1, :, :]
         visdom_show_batch(cur_channel, cur_viz, win_name="{} {}".format(win_prefix, i), nrow=4, normalize=False)
-        
+    
     visdom_show_batch(vis_shadow_img, cur_viz, win_name="{} shadow gt vs. inference".format(win_prefix), nrow=1, normalize=False)
     visdom_show_batch(get_grid_img(L_t[:batch_size]), cur_viz, win_name='{} light'.format(win_prefix), normalize=True)
-
+    if out_channel == 2:
+        visdom_show_batch(vis_touch_img, cur_viz, win_name="{} touch gt vs. inference".format(win_prefix), nrow=1, normalize=False)
+        
 def training_iteration(model, train_dataloder, optimizer, train_loss, epoch_num):
     # training
     cur_epoch_loss = 0.0
@@ -110,15 +117,18 @@ def training_iteration(model, train_dataloder, optimizer, train_loss, epoch_num)
                 mask, touch = I_s[:,:1,:,:], I_s[:,-1:,:,:]
                 
                 # predict
-                if params.baseline:
+                if params.input_channel == 1:
                     I_s = mask
-                    
+                
                 predicted_img, predicted_src_light = model(I_s, L_t)
 
                 # compute loss
                 if params.pred_touch:
                     I_t = touch
-                    
+                
+                if params.touch_loss:
+                    I_t = torch.cat((I_t, touch), axis=1)
+                
                 loss = reconstruct_loss(I_t, predicted_img)
 
                 loss.backward()
@@ -155,7 +165,7 @@ def validation_iteration(model, valid_dataloader, valid_loss, epoch_num):
                     mask, touch = I_s[:,:1,:,:], I_s[:,-1:,:,:]
 
                     # predict
-                    if params.baseline:
+                    if params.input_channel==1:
                         I_s = mask
 
                     predicted_img, predicted_src_light = model(I_s, L_t)
@@ -163,6 +173,9 @@ def validation_iteration(model, valid_dataloader, valid_loss, epoch_num):
                     # compute loss
                     if params.pred_touch:
                         I_t = touch
+                    
+                    if params.touch_loss:
+                        I_t = torch.cat((I_t, touch), axis=1)
                     
                     # predict transfer
                     predicted_img, predicted_src_light = model(I_s, L_t)
@@ -205,13 +218,9 @@ def train(params):
     valid_dataloader = DataLoader(valid_set, batch_size= min(len(valid_set), params.batch_size), shuffle=False, num_workers=params.workers, drop_last=True)
 
     # model & optimizer & scheduler & loss function
-    input_channel = 2
-    if params.baseline:
-        input_channel = 1
-    
+    input_channel = params.input_channel    
     model = Relight_SSN(input_channel, 1)    # input is mask + human
     model.to(device)    
-    optimizer = set_model_optimizer(model, params.weight_decay)
     best_weight = ''
     
     # resume from last saved points
@@ -219,7 +228,7 @@ def train(params):
         best_weight = os.path.join("weights", params.weight_file)
         checkpoint = torch.load(best_weight, map_location=device)
         model.load_state_dict(checkpoint['model_state_dict'])
-        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        # optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         best_valid_loss = checkpoint['best_loss']
         hist_train_loss = checkpoint['hist_train_loss']
         hist_valid_loss = checkpoint['hist_valid_loss']
@@ -227,16 +236,27 @@ def train(params):
             hist_lr = checkpoint['hist_lr']
         print("resuming from: {}".format(best_weight))
         del checkpoint
-    
+        
     if params.relearn:
         best_valid_loss = float('inf')
     
+    if params.tbaseline:
+        params.input_channel = 2
+        model = baseline_2_tbaseline(model)
+        model.to(device) 
+    
+    if params.touch_loss:
+        params.input_channel = 1
+        model = baseline_2_touchloss(model)
+        model.to(device) 
+        
     print(torch.cuda.device_count())
     # test multiple GPUs
     if torch.cuda.device_count() > 1 and params.multi_gpu:
         print("Let's use ", torch.cuda.device_count(), "GPUs")
         model = nn.DataParallel(model)
-
+        
+    optimizer = set_model_optimizer(model, params.weight_decay)    
     set_lr(optimizer, params.lr)
     print("Current LR: {}".format(get_lr(optimizer)))
     # scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=params.patience)
