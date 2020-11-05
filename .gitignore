@@ -1,5 +1,4 @@
 .idea/
-weights/*
 .pyc
 *.pyc
 *.png
@@ -16,7 +15,6 @@ data_process/.ipynb_checkpoints/*
 dbg*/*
 dbg*
 *.npy
-<<<<<<< HEAD
 *.exr
 GUI/dist/*
 GUI/dist/build/*
