@@ -1,1 +1,0 @@
-CUDA_VISIBLE_DEVICES=0 python train_relight_ssn.py --exp_name='general_obj_sketch' --multi_gpu --batch_size=1 --workers=22 --norm='batch_norm' --use_schedule --patience=10 --lr=1e-4 --timers=1000 --resume --weight_file="general_obj_sketch_03-August-04-44-AM.pt" --need_train --baseline --small_ds --sketch --vis_port=8003

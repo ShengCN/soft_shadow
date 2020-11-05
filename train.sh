@@ -1,1 +1,0 @@
-CUDA_VISIBLE_DEVICES=0 python train_relight_ssn.py --exp_name='group_norm' --batch_size=1 --multi_gpu --workers=1 --relearn --lr=5e-4 --timers=10 --use_schedule --patience=5 --baseline --need_train --ds_folder='dataset/new_dataset'

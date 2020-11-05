@@ -1,1 +1,0 @@
-CUDA_VISIBLE_DEVICES=0,1 python train_relight_ssn.py --exp_name='fov' --batch_size=30 --multi_gpu --workers=24 --relearn --lr=1e-3 --timers=100 --vis_port=8005 --baseline --need_train --ds_folder='/home/ysheng/Dataset/fov_exp' --resume --weight_file='fov_22-September-02-10-AM.pt'

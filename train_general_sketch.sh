@@ -1,1 +1,0 @@
-CUDA_VISIBLE_DEVICES=0,1,2 python train_relight_ssn.py --vis_port=8003 --need_train --relearn --multi_gpu --baseline --workers=66 --batch_size=1 --timers=80 --sketch --exp_name='general_sketch' --ds_folder='dataset/general_ds' --lr=1e-3 
