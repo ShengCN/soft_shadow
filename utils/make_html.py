@@ -6,6 +6,7 @@ from os.path import join
 import html
 from tqdm import tqdm
 import argparse
+import pandas as pd
 import matplotlib.pyplot as plt
 
 def get_files(folder):
@@ -103,6 +104,31 @@ def vis_files_in_folder():
     webpage.save()
     print('finished')
     
+def vis_files(df_file):
+    """ input is a pandas dataframe
+        format: path, path,..., name,name, ...
+    """
+    folder = '.'
+    webpage = html.HTML(folder, 'benchmark', reflesh=1)    
+
+    relative_folder = './imgs'
+#     for i, prefix in enumerate(prefix_set):
+#         ims = [join(relative_folder, prefix + '{:03d}.png'.format(i)) for i in range(len(files) // len(prefix_set))]
+#         txts = [prefix + '{:03d}'.format(i) for i in range(len(files) // len(prefix_set))]
+#         links = ims
+#         webpage.add_images(ims, txts, links)
+    
+    df = pd.read_csv(df_file)
+    for i,v in tqdm(df.iterrows(), total=len(df)):
+        img_range = len(v)//2+1
+        imgs = [join(relative_folder,v[i]) for i in range(1,img_range)]
+        txts = [v[i] for i in range(img_range, len(v))]
+        links = imgs
+        webpage.add_images(imgs, txts, links)
+        
+    webpage.save()
+    print('finished')
+    
 if __name__ == "__main__":
     # parser = argparse.ArgumentParser(description='evaluatoin pipeline')
     # parser.add_argument('-p','--pattern', action='store_true', help='pattern?')
@@ -117,4 +143,4 @@ if __name__ == "__main__":
     #     webpage = html.HTML(vis_real_folder, 'real evaluation', reflesh=1)    
     #     eval_gen(webpage, vis_real_folder, False)
     #     webpage.save()
-    vis_files_in_folder()
+    vis_files('/home/ysheng/Documents/paper_project/adobe/soft_shadow/data_process/vis_touch.csv')

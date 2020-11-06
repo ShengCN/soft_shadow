@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 import cv2
 from params import params
 from .random_pattern import random_pattern
+import perturb_touch
 
 class ToTensor(object):
     """Convert ndarrays in sample to Tensors."""
@@ -60,7 +61,8 @@ class SSN_Dataset(Dataset):
         
         self.thread_id = os.getpid()
         self.seed = os.getpid()
-
+        self.perturb = not parameter.pred_touch and not parameter.touch_loss
+        
     def __len__(self):
         if self.is_training:
             return self.training_num
@@ -97,7 +99,10 @@ class SSN_Dataset(Dataset):
         else:
             touch_img = touch_img/np.max(touch_img)
             touch_img = touch_img[:,:,np.newaxis]
-
+        
+        if self.perturb:
+            touch_img = perturb_touch.random_perturb()
+        
         input_img = np.concatenate((mask_img, touch_img), axis=2)
         input_img, shadow_img, light_img = self.to_tensor(input_img), self.to_tensor(shadow_img),self.to_tensor(light_img)
         return input_img, light_img, shadow_img
