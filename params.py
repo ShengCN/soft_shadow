@@ -78,7 +78,8 @@ def parse_params():
     parser.add_argument('--pred_touch', action='store_true', help='Use touching surface')
     parser.add_argument('--input_channel', type=int, default=1, help='how many input channels')
     
-    # based on baseline method, for fine tuning 
+    # based on baseline method, for fine tuning
+    parser.add_argument('--from_baseline', action='store_true', help='training from baseline')
     parser.add_argument('--tbaseline', action='store_true', help='T-baseline, input two channels')
     parser.add_argument('--touch_loss', action='store_true', help='Use touching loss')
     
