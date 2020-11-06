@@ -5,7 +5,7 @@ import random
 random.seed(19920208)
 
 def random_kernel():
-    ksize = random.randint(1,5)
+    ksize = random.randint(1,3)
     kernel = np.ones((ksize, ksize))
     return kernel
     
