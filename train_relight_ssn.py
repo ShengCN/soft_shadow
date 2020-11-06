@@ -305,7 +305,7 @@ def train(params):
         plt.plot(hist_train_loss, label='train loss')
         plt.plot(hist_train_loss, label='valid loss')
         plt.legend()
-        plt.savefig('loss_plot.png')
+        plt.savefig('{}_loss_plot.png'.format(params.exp_name))
         plt.close()
         
         # termination
