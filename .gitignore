@@ -19,3 +19,4 @@ dbg*
 GUI/dist/*
 GUI/dist/build/*
 dataset
+tensorboard_log/*

@@ -30,7 +30,8 @@ exp_name = params.exp_name
 # cur_viz = setup_visdom(params.vis_port)
 tensorboard_folder = 'tensorboard_log/runs'
 os.makedirs(tensorboard_folder, exist_ok=True)
-writer = SummaryWriter(join(tensorboard_folder, '{}'.format(exp_name)))
+timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+writer = SummaryWriter(join(tensorboard_folder, '{}_{}'.format(exp_name, timestamp)))
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -64,7 +65,7 @@ def reconstruct_loss(gt_img, pred_img):
     return torch.norm(gt_img-pred_img, 2)
 
 def get_grid_img(tensor_img, norm=True):
-    return utils.make_grid(tensor_img, normalize=norm).detach().cpu().unsqueeze(0)
+    return utils.make_grid(tensor_img, normalize=norm, nrow=8).detach().cpu().unsqueeze(0)
 
 def tensorboard_plot_img(I_t, predicted_img, I_s, L_t, is_training=True, save_batch=False):
     batch_size = min(I_t.shape[0], 4)
@@ -233,7 +234,7 @@ def train(params):
         model = Relight_SSN(input_channel, 1)    # input is mask + human
         model.to(device)    
     else:
-        model = Relight_SSN(input_channel, 1)
+        model = Relight_SSN(1, 1)
         model.to(device)
         baseline_checkpoint = torch.load("weights/human_baseline.pt", map_location=device)
         model.load_state_dict(baseline_checkpoint['model_state_dict'])
