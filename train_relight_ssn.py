@@ -251,7 +251,7 @@ def train(params):
         params.input_channel = 1
         model = baseline_2_touchloss(model)
         model.to(device) 
-    
+        
     # resume from last saved points
     if params.resume:
         best_weight = os.path.join("weights", params.weight_file)
@@ -308,13 +308,12 @@ def train(params):
             tensorboard_log(log_info, writer)
 
             best_valid_loss = cur_valid_loss
-            global_params = options().get_params()
             
             outfname = '{}_{}.pt'.format(exp_name, get_cur_time_stamp())
-            best_weight = save_model("weights", model, optimizer, epoch, best_valid_loss, outfname, hist_train_loss, hist_valid_loss, hist_lr, global_params)
+            best_weight = save_model("weights", model, optimizer, epoch, best_valid_loss, outfname, hist_train_loss, hist_valid_loss, hist_lr, params)
 
         outfname = '{}.pt'.format(exp_name)
-        save_model("weights", model, optimizer, epoch, best_valid_loss, outfname, hist_train_loss, hist_valid_loss, hist_lr, global_params)
+        save_model("weights", model, optimizer, epoch, best_valid_loss, outfname, hist_train_loss, hist_valid_loss, hist_lr, params)
         
         # saving loss to local directory
         plt.figure()
