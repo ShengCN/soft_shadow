@@ -16,6 +16,8 @@ from ssn.ssn import Relight_SSN, baseline_2_tbaseline, baseline_2_touchloss
 from utils.utils_file import get_cur_time_stamp, create_folder
 from utils.net_utils import save_model, get_lr, set_lr
 from utils.visdom_utils import setup_visdom, visdom_plot_loss, visdom_log, visdom_show_batch
+from utils.tensorboard_utils import *
+from torch.utils.tensorboard import SummaryWriter
 from params import params as options, parse_params
 import matplotlib.pyplot as plt
 from evaluation import exp_predict, exp_metric
@@ -25,7 +27,10 @@ import pickle
 params = parse_params()
 print("Params: {}".format(params))
 exp_name = params.exp_name
-cur_viz = setup_visdom(params.vis_port)
+# cur_viz = setup_visdom(params.vis_port)
+tensorboard_folder = 'tensorboard_log/runs'
+os.makedirs(tensorboard_folder, exist_ok=True)
+writer = SummaryWriter(join(tensorboard_folder, '{}'.format(exp_name)))
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -61,31 +66,33 @@ def reconstruct_loss(gt_img, pred_img):
 def get_grid_img(tensor_img, norm=True):
     return utils.make_grid(tensor_img, normalize=norm).detach().cpu().unsqueeze(0)
 
-def visdom_plot_img(I_t, predicted_img, I_s, L_t, is_training=True, save_batch=False):
+def tensorboard_plot_img(I_t, predicted_img, I_s, L_t, is_training=True, save_batch=False):
     batch_size = min(I_t.shape[0], 4)
-    
+
     out_channel = predicted_img.shape[1]
-    
+
     # import pdb; pdb.set_trace()
-    vis_predicted_img = get_grid_img(predicted_img[:batch_size,0:1,:,:], True)
-    vis_predicted_img_gt = get_grid_img(I_t[:batch_size,:1,:, :], True)
-    
+    vis_predicted_img = get_grid_img(predicted_img[:batch_size, 0:1, :, :], True)
+    vis_predicted_img_gt = get_grid_img(I_t[:batch_size, :1, :, :], True)
+
     if out_channel == 2:
-        vis_touch_img = get_grid_img(predicted_img[:batch_size,-1:,:,:], True)
-        vis_touch_img_gt = get_grid_img(I_t[:batch_size,-1:,:, :], True)
-    
+        vis_touch_img = get_grid_img(predicted_img[:batch_size, -1:, :, :], True)
+        vis_touch_img_gt = get_grid_img(I_t[:batch_size, -1:, :, :], True)
+
     if save_batch:
-        vis_predicted_img_np = np.clip(vis_predicted_img[0].detach().cpu().numpy().transpose((1,2,0)), 0.0, 1.0)
-        vis_predicted_img_gt_np = np.clip(vis_predicted_img_gt[0].detach().cpu().numpy().transpose((1,2,0)), 0.0, 1.0)
+        vis_predicted_img_np = np.clip(vis_predicted_img[0].detach().cpu().numpy().transpose((1, 2, 0)), 0.0, 1.0)
+        vis_predicted_img_gt_np = np.clip(vis_predicted_img_gt[0].detach().cpu().numpy().transpose((1, 2, 0)), 0.0, 1.0)
         saving_folder = 'training_result'
-        pred_fname, gt_fname = os.path.join(saving_folder, 'predict_{}.png'.format(datetime.datetime.now())), os.path.join(saving_folder,'gt_{}.png'.format(datetime.datetime.now()))
+        pred_fname, gt_fname = os.path.join(saving_folder,
+                                            'predict_{}.png'.format(datetime.datetime.now())), os.path.join(
+            saving_folder, 'gt_{}.png'.format(datetime.datetime.now()))
         plt.imsave(pred_fname, vis_predicted_img_np, cmap='gray')
         plt.imsave(gt_fname, vis_predicted_img_gt_np, cmap='gray')
 
     vis_shadow_img = torch.cat((vis_predicted_img_gt, vis_predicted_img))
     if out_channel == 2:
         vis_touch_img = torch.cat((vis_touch_img_gt, vis_touch_img))
-        
+
     if is_training:
         win_prefix = 'train'
     else:
@@ -93,14 +100,17 @@ def visdom_plot_img(I_t, predicted_img, I_s, L_t, is_training=True, save_batch=F
 
     channel = I_s.shape[1]
     for i in range(channel):
-        cur_channel = I_s[:batch_size, i:i+1, :, :]
-        visdom_show_batch(cur_channel, cur_viz, win_name="{} {}".format(win_prefix, i), nrow=4, normalize=False)
-    
-    visdom_show_batch(vis_shadow_img, cur_viz, win_name="{} shadow gt vs. inference".format(win_prefix), nrow=1, normalize=False)
-    visdom_show_batch(get_grid_img(L_t[:batch_size]), cur_viz, win_name='{} light'.format(win_prefix), normalize=True)
+        cur_channel = I_s[:batch_size, i:i + 1, :, :]
+        cur_channel = get_grid_img(cur_channel, True)
+        tensorboard_show_batch(cur_channel, writer, win_name="{} {}".format(win_prefix, i), nrow=4, normalize=False)
+
+    tensorboard_show_batch(vis_shadow_img, writer, win_name="{} shadow gt vs. inference".format(exp_name,win_prefix), nrow=1,
+                      normalize=False)
+    tensorboard_show_batch(get_grid_img(L_t[:batch_size]), writer, win_name='{} light'.format(win_prefix), normalize=True)
     if out_channel == 2:
-        visdom_show_batch(vis_touch_img, cur_viz, win_name="{} touch gt vs. inference".format(win_prefix), nrow=1, normalize=False)
-        
+        tensorboard_show_batch(vis_touch_img, writer, win_name="{} touch gt vs. inference".format(win_prefix), nrow=1,
+                          normalize=False)
+
 def training_iteration(model, train_dataloder, optimizer, train_loss, epoch_num):
     # training
     cur_epoch_loss = 0.0
@@ -138,11 +148,11 @@ def training_iteration(model, train_dataloder, optimizer, train_loss, epoch_num)
                 
                 # visualize results
                 if i % 10 == 0:
-                    visdom_plot_img(I_t, predicted_img, inputs, L_t, save_batch=params.save)
+                    tensorboard_plot_img(I_t, predicted_img, inputs, L_t, save_batch=params.save)
 
                 # keep tracking
                 train_loss.append(loss.item()/np.sqrt(params.batch_size))
-                visdom_plot_loss("train_total_loss", train_loss, cur_viz)
+                tensorboard_plot_loss("train_total_loss", train_loss, writer)
 
                 t.update()
 
@@ -187,18 +197,17 @@ def validation_iteration(model, valid_dataloader, valid_loss, epoch_num):
 
                     # visualize results
                     if i % 10 == 0:
-                        visdom_plot_img(I_t, predicted_img, inputs, L_t, False)
+                        tensorboard_plot_img(I_t, predicted_img, inputs, L_t, False)
 
                     # keep tracking
                     valid_loss.append(loss.item()/np.sqrt(params.batch_size))
 
-                    visdom_plot_loss("valid_total_loss", valid_loss, cur_viz)
+                    tensorboard_plot_loss("valid_total_loss", valid_loss, writer)
                     t.update()
 
     # Finish one epoch
     # import pdb; pdb.set_trace()
     cur_epoch_loss /= (np.sqrt(params.batch_size) * len(valid_dataloader) * cur_timer) 
-    # cur_epoch_loss /= (params.timers * len(train_dataloder) * np.sqrt(params.batch_size))
 
     return cur_epoch_loss
 
@@ -277,19 +286,19 @@ def train(params):
             scheduler.step()
 
         log_info += "Current epoch: {} Learning Rate: {}  <br>".format(epoch, get_lr(optimizer))
-        visdom_log(log_info, cur_viz)
+        tensorboard_plot_loss(log_info, writer)
 
         hist_train_loss.append(cur_train_loss)
         hist_valid_loss.append(cur_valid_loss)
 
-        visdom_plot_loss("history train loss", hist_train_loss, cur_viz)
-        visdom_plot_loss("history valid loss", hist_valid_loss, cur_viz)
+        tensorboard_plot_loss("history train loss", hist_train_loss, writer)
+        tensorboard_plot_loss("history valid loss", hist_valid_loss, writer)
 
         log_info += "Epoch: {} training loss: {}, valid loss: {}  <br>".format(epoch, cur_train_loss, cur_valid_loss)
         # save results
         if best_valid_loss > cur_valid_loss:
             log_info += "<br> ---------- Exp: {} Find better loss: {} at {} --------  <br>".format(exp_name, cur_valid_loss, datetime.datetime.now())
-            visdom_log(log_info, cur_viz)
+            tensorboard_log(log_info, writer)
 
             best_valid_loss = cur_valid_loss
             global_params = options().get_params()
@@ -298,7 +307,7 @@ def train(params):
             best_weight = save_model("weights", model, optimizer, epoch, best_valid_loss, outfname, hist_train_loss, hist_valid_loss, hist_lr, global_params)
 
         outfname = '{}.pt'.format(exp_name)
-        best_weight = save_model("weights", model, optimizer, epoch, best_valid_loss, outfname, hist_train_loss, hist_valid_loss, hist_lr, global_params)
+        save_model("weights", model, optimizer, epoch, best_valid_loss, outfname, hist_train_loss, hist_valid_loss, hist_lr, global_params)
         
         # saving loss to local directory
         plt.figure()
