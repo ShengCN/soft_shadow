@@ -284,16 +284,17 @@ def train(params):
     # training iterations
     for epoch in range(params.epochs):
         # training
-        cur_train_loss = training_iteration(model, train_dataloder, optimizer, train_loss, epoch)
+#         cur_train_loss = training_iteration(model, train_dataloder, optimizer, train_loss, epoch)
 
-        # validation
-        cur_valid_loss = validation_iteration(model, valid_dataloader, valid_loss, epoch)
+#         # validation
+#         cur_valid_loss = validation_iteration(model, valid_dataloader, valid_loss, epoch)
+        cur_train_loss, cur_valid_loss = 0, 0
         
         if params.use_schedule:
             scheduler.step()
 
         log_info += "Current epoch: {} Learning Rate: {}  <br>".format(epoch, get_lr(optimizer))
-        tensorboard_plot_loss(log_info, writer)
+        tensorboard_log(log_info, writer)
 
         hist_train_loss.append(cur_train_loss)
         hist_valid_loss.append(cur_valid_loss)
