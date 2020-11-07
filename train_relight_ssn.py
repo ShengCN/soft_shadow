@@ -284,11 +284,10 @@ def train(params):
     # training iterations
     for epoch in range(params.epochs):
         # training
-#         cur_train_loss = training_iteration(model, train_dataloder, optimizer, train_loss, epoch)
+        cur_train_loss = training_iteration(model, train_dataloder, optimizer, train_loss, epoch)
 
 #         # validation
-#         cur_valid_loss = validation_iteration(model, valid_dataloader, valid_loss, epoch)
-        cur_train_loss, cur_valid_loss = 0, 0
+        cur_valid_loss = validation_iteration(model, valid_dataloader, valid_loss, epoch)
         
         if params.use_schedule:
             scheduler.step()
