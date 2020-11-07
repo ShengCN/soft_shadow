@@ -226,11 +226,30 @@ def train(params):
     valid_set = SSN_Dataset(ds_folder, False)
     valid_dataloader = DataLoader(valid_set, batch_size= min(len(valid_set), params.batch_size), shuffle=False, num_workers=params.workers, drop_last=True)
 
-    # model & optimizer & scheduler & loss function
-    input_channel = params.input_channel    
-    model = Relight_SSN(input_channel, 1)    # input is mask + human
-    model.to(device)    
     best_weight = ''
+    # model & optimizer & scheduler & loss function
+    if not params.from_baseline:
+        input_channel = params.input_channel    
+        model = Relight_SSN(input_channel, 1)    # input is mask + human
+        model.to(device)    
+    else:
+        model = Relight_SSN(input_channel, 1)
+        model.to(device)
+        baseline_checkpoint = torch.load("weights/human_baseline.pt", map_location=device)
+        model.load_state_dict(baseline_checkpoint['model_state_dict'])
+        
+    if params.relearn:
+        best_valid_loss = float('inf')
+    
+    if params.tbaseline:
+        params.input_channel = 2
+        model = baseline_2_tbaseline(model)
+        model.to(device) 
+    
+    if params.touch_loss:
+        params.input_channel = 1
+        model = baseline_2_touchloss(model)
+        model.to(device) 
     
     # resume from last saved points
     if params.resume:
@@ -245,20 +264,7 @@ def train(params):
             hist_lr = checkpoint['hist_lr']
         print("resuming from: {}".format(best_weight))
         del checkpoint
-        
-    if params.relearn:
-        best_valid_loss = float('inf')
     
-    if params.tbaseline:
-        params.input_channel = 2
-        model = baseline_2_tbaseline(model)
-        model.to(device) 
-    
-    if params.touch_loss:
-        params.input_channel = 1
-        model = baseline_2_touchloss(model)
-        model.to(device) 
-        
     print(torch.cuda.device_count())
     # test multiple GPUs
     if torch.cuda.device_count() > 1 and params.multi_gpu:
