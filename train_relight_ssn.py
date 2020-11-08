@@ -238,10 +238,7 @@ def train(params):
         model.to(device)
         baseline_checkpoint = torch.load("weights/human_baseline.pt", map_location=device)
         model.load_state_dict(baseline_checkpoint['model_state_dict'])
-        
-    if params.relearn:
-        best_valid_loss = float('inf')
-    
+            
     if params.tbaseline:
         params.input_channel = 2
         model = baseline_2_tbaseline(model)
@@ -273,6 +270,9 @@ def train(params):
         for i in range(1, len(hist_valid_loss)):
             tensorboard_plot_loss("history valid loss", hist_valid_loss[:i], writer)
     
+    if params.relearn:
+        best_valid_loss = float('inf')
+        
     print(torch.cuda.device_count())
     # test multiple GPUs
     if torch.cuda.device_count() > 1 and params.multi_gpu:
