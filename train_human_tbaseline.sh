@@ -1,1 +1,1 @@
-CUDA_VISIBLE_DEVICES=0,1,2 python train_relight_ssn.py --multi_gpu --vis_port=8002 --relearn --from_baseline --tbaseline --workers=82 --batch_size=82 --timers=20 --exp_name='human_tbaseline' --ds_folder='dataset/human_ds' --lr=1e-3 --resume --weight_file="human_tbaseline.pt"
+CUDA_VISIBLE_DEVICES=0,1,2 python train_relight_ssn.py --multi_gpu --vis_port=8002 --relearn --from_baseline --tbaseline --workers=82 --batch_size=82 --timers=40 --exp_name='human_tbaseline' --ds_folder='dataset/human_ds' --lr=5e-4 --resume --weight_file="human_tbaseline.pt"

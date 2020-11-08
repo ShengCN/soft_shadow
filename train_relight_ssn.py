@@ -265,6 +265,13 @@ def train(params):
             hist_lr = checkpoint['hist_lr']
         print("resuming from: {}".format(best_weight))
         del checkpoint
+        
+        # tensorboard writer update history
+        for i in range(1, len(hist_train_loss)):
+            tensorboard_plot_loss("history train loss", hist_train_loss[:i], writer)
+        
+        for i in range(1, len(hist_valid_loss)):
+            tensorboard_plot_loss("history valid loss", hist_valid_loss[:i], writer)
     
     print(torch.cuda.device_count())
     # test multiple GPUs
