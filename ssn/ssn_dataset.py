@@ -93,15 +93,10 @@ class SSN_Dataset(Dataset):
 
         h,w = mask_img.shape[0], mask_img.shape[1] 
         touch_img = self.read_img(touch_path)
-        touch_img = touch_img[:,:,0] + touch_img[:,:,1] + touch_img[:,:,2]
-        if np.max(touch_img) < 1e-3:
-            touch_img = np.zeros((h,w,1))
-        else:
-            touch_img = touch_img/np.max(touch_img)
-            touch_img = touch_img[:,:,np.newaxis]
+        touch_img = touch_img[:,:,0:1] 
         
-        if self.perturb:
-            touch_img = random_perturb(touch_img)
+#         if self.perturb:
+#             touch_img = random_perturb(touch_img)
         
         input_img = np.concatenate((mask_img, touch_img), axis=2)
         input_img, shadow_img, light_img = self.to_tensor(input_img), self.to_tensor(shadow_img),self.to_tensor(light_img)

@@ -19,13 +19,13 @@ def normalize_img(imgs):
     imgs = torch.clamp(imgs, 0.0,1.0)
     return imgs
 
-def tensorboard_show_batch(imgs, writer, win_name=None, nrow=2, normalize=True):
+def tensorboard_show_batch(imgs, writer, win_name=None, nrow=2, normalize=True, step=0):
     if normalize:
         imgs = normalize_img(imgs)
 
-    writer.add_images('{}'.format(win_name), imgs)
+    writer.add_images('{}'.format(win_name), imgs, step)
     writer.flush()
 
-def tensorboard_log(log_info, writer, win_name='logger'):
-    writer.add_text(win_name, log_info)
+def tensorboard_log(log_info, writer, win_name='logger', step=0):
+    writer.add_text(win_name, log_info, step)
     writer.flush()

@@ -10,14 +10,15 @@ def random_kernel():
     return kernel
     
 def random_perturb(img):
-    perturbed = img.copy()
-    if random.random() < 0.5:
-        perturbed = cv2.erode(perturbed, random_kernel(), iterations = 1)
+    return img
+#     perturbed = img.copy()
+#     if random.random() < 0.5:
+#         perturbed = cv2.erode(perturbed, random_kernel(), iterations = 1)
     
-    if random.random() < 0.5:
-        perturbed = cv2.dilate(perturbed, random_kernel(), iterations = 1)
+#     if random.random() < 0.5:
+#         perturbed = cv2.dilate(perturbed, random_kernel(), iterations = 1)
     
-    cv2.normalize(perturbed, perturbed, 0.0,1.0, cv2.NORM_MINMAX)
-    if len(perturbed.shape) == 2:
-        perturbed = perturbed[:,:,np.newaxis]
-    return perturbed
+#     cv2.normalize(perturbed, perturbed, 0.0,1.0, cv2.NORM_MINMAX)
+#     if len(perturbed.shape) == 2:
+#         perturbed = perturbed[:,:,np.newaxis]
+#     return perturbed

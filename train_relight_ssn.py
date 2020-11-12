@@ -67,6 +67,7 @@ def reconstruct_loss(gt_img, pred_img):
 def get_grid_img(tensor_img, norm=True):
     return utils.make_grid(tensor_img, normalize=norm, nrow=8).detach().cpu().unsqueeze(0)
 
+cur_step = 0
 def tensorboard_plot_img(I_t, predicted_img, I_s, L_t, is_training=True, save_batch=False):
     batch_size = min(I_t.shape[0], 4)
 
@@ -103,14 +104,14 @@ def tensorboard_plot_img(I_t, predicted_img, I_s, L_t, is_training=True, save_ba
     for i in range(channel):
         cur_channel = I_s[:batch_size, i:i + 1, :, :]
         cur_channel = get_grid_img(cur_channel, True)
-        tensorboard_show_batch(cur_channel, writer, win_name="{} {}".format(win_prefix, i), nrow=4, normalize=False)
+        tensorboard_show_batch(cur_channel, writer, win_name="{} {}".format(win_prefix, i), nrow=4, normalize=False, step=cur_step)
 
     tensorboard_show_batch(vis_shadow_img, writer, win_name="{} shadow gt vs. inference".format(exp_name,win_prefix), nrow=1,
-                      normalize=False)
-    tensorboard_show_batch(get_grid_img(L_t[:batch_size]), writer, win_name='{} light'.format(win_prefix), normalize=True)
+                      normalize=False, step=cur_step)
+    tensorboard_show_batch(get_grid_img(L_t[:batch_size]), writer, win_name='{} light'.format(win_prefix), normalize=True, step=cur_step)
     if out_channel == 2:
         tensorboard_show_batch(vis_touch_img, writer, win_name="{} touch gt vs. inference".format(win_prefix), nrow=1,
-                          normalize=False)
+                          normalize=False, step=cur_step)
 
 def training_iteration(model, train_dataloder, optimizer, train_loss, epoch_num):
     # training
@@ -121,6 +122,7 @@ def training_iteration(model, train_dataloder, optimizer, train_loss, epoch_num)
         t.set_description("Ep. {}".format(epoch_num))
         for j in range(params.timers):
             for i, gt_data in enumerate(train_dataloder):
+                cur_step = i
                 inputs, light, shadow = gt_data[0], gt_data[1], gt_data[2]
                 I_s, L_t, I_t = inputs.to(device), light.to(device), shadow.to(device)
                 optimizer.zero_grad()
@@ -138,10 +140,14 @@ def training_iteration(model, train_dataloder, optimizer, train_loss, epoch_num)
                     I_t = touch
                 
                 if params.touch_loss:
-                    I_t = torch.cat((I_t, touch), axis=1)
+                    I_t = torch.cat((I_t, touch * 30.0), axis=1)
                 
                 loss = reconstruct_loss(I_t, predicted_img)
-
+                
+                if params.touch_loss:
+                    touch_loss = reconstruct_loss(I_t[:,-1:,:,:], predicted_img[:,-1:,:,:])
+                    tensorboard_plot_loss("train_ao_loss", [touch_loss/np.sqrt(params.batch_size)], writer)
+                
                 loss.backward()
                 optimizer.step()
                 
@@ -185,17 +191,18 @@ def validation_iteration(model, valid_dataloader, valid_loss, epoch_num):
                     if params.pred_touch:
                         I_t = touch
                     
-                    if params.touch_loss:
-                        I_t = torch.cat((I_t, touch), axis=1)
-                    
                     # predict transfer
                     predicted_img, predicted_src_light = model(I_s, L_t)
+                    
+                    if params.touch_loss:
+                        predicted_img = predicted_img[:,:1,:,:]
 
                     # compute loss
                     loss = reconstruct_loss(I_t, predicted_img)
 
                     cur_epoch_loss += loss.item()
 
+                    cur_step = i
                     # visualize results
                     if i % 10 == 0:
                         tensorboard_plot_img(I_t, predicted_img, inputs, L_t, False)
@@ -300,7 +307,7 @@ def train(params):
             scheduler.step()
 
         log_info += "Current epoch: {} Learning Rate: {}  <br>".format(epoch, get_lr(optimizer))
-        tensorboard_log(log_info, writer)
+        tensorboard_log(log_info, writer, step=epoch)
 
         hist_train_loss.append(cur_train_loss)
         hist_valid_loss.append(cur_valid_loss)
@@ -312,7 +319,7 @@ def train(params):
         # save results
         if best_valid_loss > cur_valid_loss:
             log_info += "<br> ---------- Exp: {} Find better loss: {} at {} --------  <br>".format(exp_name, cur_valid_loss, datetime.datetime.now())
-            tensorboard_log(log_info, writer)
+            tensorboard_log(log_info, writer, step=epoch)
 
             best_valid_loss = cur_valid_loss
             

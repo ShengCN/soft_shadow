@@ -1,1 +1,1 @@
-CUDA_VISIBLE_DEVICES=0,1,2 python train_relight_ssn.py --multi_gpu --vis_port=8002 --relearn --from_baseline --touch_loss --workers=72 --batch_size=72 --timers=40 --exp_name='general_touchloss' --ds_folder='dataset/human_ds' --lr=1e-3 --resume --weight_file="human_baseline.pt"
+CUDA_VISIBLE_DEVICES=0,1,2 python train_relight_ssn.py --multi_gpu --vis_port=8002 --relearn --from_baseline --touch_loss --workers=78 --batch_size=78 --timers=40 --exp_name='human_touchloss' --ds_folder='dataset/human_ds' --lr=1e-5 --resume --weight_file='human_touchloss_10-November-09-13-AM.pt'
