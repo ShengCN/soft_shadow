@@ -130,17 +130,4 @@ def vis_files(df_file):
     print('finished')
     
 if __name__ == "__main__":
-    # parser = argparse.ArgumentParser(description='evaluatoin pipeline')
-    # parser.add_argument('-p','--pattern', action='store_true', help='pattern?')
-
-    # options = parser.parse_args()
-
-    # if options.pattern:
-    #     webpage = html.HTML(vis_pattern_folder, 'pattern evaluation', reflesh=1)    
-    #     eval_gen(webpage, vis_pattern_folder)
-    #     webpage.save()
-    # else:
-    #     webpage = html.HTML(vis_real_folder, 'real evaluation', reflesh=1)    
-    #     eval_gen(webpage, vis_real_folder, False)
-    #     webpage.save()
-    vis_files('/home/ysheng/Documents/paper_project/adobe/soft_shadow/data_process/vis_touch.csv')
+    vis_files('/home/ysheng/Documents/paper_project/adobe/soft_shadow/benchmark_results/html.csv')

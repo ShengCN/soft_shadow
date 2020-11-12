@@ -113,6 +113,7 @@ def tensorboard_plot_img(I_t, predicted_img, I_s, L_t, is_training=True, save_ba
         tensorboard_show_batch(vis_touch_img, writer, win_name="{} touch gt vs. inference".format(win_prefix), nrow=1,
                           normalize=False, step=cur_step)
 
+touch_loss = []
 def training_iteration(model, train_dataloder, optimizer, train_loss, epoch_num):
     # training
     cur_epoch_loss = 0.0
@@ -145,8 +146,9 @@ def training_iteration(model, train_dataloder, optimizer, train_loss, epoch_num)
                 loss = reconstruct_loss(I_t, predicted_img)
                 
                 if params.touch_loss:
-                    touch_loss = reconstruct_loss(I_t[:,-1:,:,:], predicted_img[:,-1:,:,:])
-                    tensorboard_plot_loss("train_ao_loss", [touch_loss/np.sqrt(params.batch_size)], writer)
+                    cur_touch_loss = reconstruct_loss(I_t[:,-1:,:,:], predicted_img[:,-1:,:,:])/np.sqrt(params.batch_size)
+                    touch_loss.append(cur_touch_loss)
+                    tensorboard_plot_loss("train_ao_loss", touch_loss, writer)
                 
                 loss.backward()
                 optimizer.step()
