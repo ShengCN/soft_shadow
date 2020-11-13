@@ -3,7 +3,7 @@ import torch
 from torch.utils.tensorboard import SummaryWriter
 
 def tensorboard_plot_loss(win_name, loss, writer):
-    writer.add_scalar("Loss/{}".format(win_name), loss)
+    writer.add_scalar("Loss/{}".format(win_name), loss[-1], len(loss))
     writer.flush()
 
 def normalize_img(imgs):

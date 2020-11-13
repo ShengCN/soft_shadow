@@ -113,6 +113,7 @@ def tensorboard_plot_img(I_t, predicted_img, I_s, L_t, is_training=True, save_ba
         tensorboard_show_batch(vis_touch_img, writer, win_name="{} touch gt vs. inference".format(win_prefix), nrow=1,
                           normalize=False, step=cur_step)
 
+ao_loss = []
 def training_iteration(model, train_dataloder, optimizer, train_loss, epoch_num):
     # training
     cur_epoch_loss = 0.0
@@ -146,7 +147,8 @@ def training_iteration(model, train_dataloder, optimizer, train_loss, epoch_num)
                 
                 if params.touch_loss:
                     touch_loss = reconstruct_loss(I_t[:,-1:,:,:], predicted_img[:,-1:,:,:])/np.sqrt(params.batch_size)
-                    tensorboard_plot_loss("train_ao_loss", touch_loss/np.sqrt(params.batch_size), writer)
+                    ao_loss.append(touch_loss.item())
+                    tensorboard_plot_loss("train_ao_loss", ao_loss, writer)
                 
                 loss.backward()
                 optimizer.step()
@@ -159,7 +161,7 @@ def training_iteration(model, train_dataloder, optimizer, train_loss, epoch_num)
 
                 # keep tracking
                 train_loss.append(loss.item()/np.sqrt(params.batch_size))
-                tensorboard_plot_loss("train_total_loss", train_loss[-1], writer)
+                tensorboard_plot_loss("train_total_loss", train_loss, writer)
 
                 t.update()
 
@@ -210,7 +212,7 @@ def validation_iteration(model, valid_dataloader, valid_loss, epoch_num):
                     # keep tracking
                     valid_loss.append(loss.item()/np.sqrt(params.batch_size))
 
-                    tensorboard_plot_loss("valid_total_loss", valid_loss[-1], writer)
+                    tensorboard_plot_loss("valid_total_loss", valid_loss, writer)
                     t.update()
 
     # Finish one epoch
@@ -272,10 +274,10 @@ def train(params):
         
         # tensorboard writer update history
         for i in range(0, len(hist_train_loss)):
-            tensorboard_plot_loss("history train loss", hist_train_loss[i], writer)
+            tensorboard_plot_loss("history train loss", hist_train_loss[:i+1], writer)
         
         for i in range(0, len(hist_valid_loss)):
-            tensorboard_plot_loss("history valid loss", hist_valid_loss[i], writer)
+            tensorboard_plot_loss("history valid loss", hist_valid_loss[:i+1], writer)
     
     if params.relearn:
         best_valid_loss = float('inf')
@@ -312,8 +314,8 @@ def train(params):
         hist_train_loss.append(cur_train_loss)
         hist_valid_loss.append(cur_valid_loss)
 
-        tensorboard_plot_loss("history train loss", hist_train_loss[-1], writer)
-        tensorboard_plot_loss("history valid loss", hist_valid_loss[-1], writer)
+        tensorboard_plot_loss("history train loss", hist_train_loss, writer)
+        tensorboard_plot_loss("history valid loss", hist_valid_loss, writer)
 
         log_info += "Epoch: {} training loss: {}, valid loss: {}  <br>".format(epoch, cur_train_loss, cur_valid_loss)
         # save results
